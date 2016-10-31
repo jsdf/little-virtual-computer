@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Little Virtual Computer 1</title>
+</head>
+<body>
+  <style type="text/css">
+    label {
+      display: block;
+    }
+    textarea {
+      display: block;
+      font-family: monospace;
+    }
+  </style>
+  <button onclick="stepOnce()">step</button>
+  <button onclick="runToEnd()">run</button>
+  <button onclick="location.reload()">reset</button>
+  <label>program counter<input id="programCounter"></input></label>
+  current program location:
+  <textarea id="stepper" readonly rows="10" cols="80">
+  </textarea>
+  memory contents:
+  <textarea id="memoryView" readonly rows="10" cols="80">
+  </textarea>
+  <div>
+    <label>
+      program code input:
+    </label>
+<textarea id="program" rows="10" cols="80">
+set_value 0 4
+set_value 1 4
+add 0 1
+</textarea>
+    <button onclick="loadProgram()">load program</button>
+  </div>
+  <script type="text/javascript" src="./computer1.js"></script>
+</body>
+</html>
