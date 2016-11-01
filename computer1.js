@@ -128,61 +128,27 @@ function step() {
   return false;
 }
 
+function updateUI() {
+  UI.update(MEMORY, programCounter, program);
+}
+
 function stepOnce() {
   step();
-  updateOutput();
+  updateUI();
 }
 function runToEnd() {
   let done = false;
   while(!done) {
     done = step();
   }
-  updateOutput();
+
+  updateUI();
 }
 
-// boring code for rendering user interface of the simulator
-// not really important for understanding how computers work
-const stepperEl = document.getElementById('stepper');
-const memoryViewEl = document.getElementById('memoryView');
-const programCounterEl = document.getElementById('programCounter');
-
 function loadProgram() {
-  const programText = document.getElementById('program').textContent;
+  const programText = UI.getProgramText();
   program = parseProgramText(programText);
 }
 
-const LINES_TO_PRINT = 20;
-function updateOutput() {
-  programCounterEl.value = programCounter;
-  updateStepper();
-  updateMemoryView();
-}
-
-function updateStepper() {
-  let stepperOutput = '';
-  const offset = -Math.floor(LINES_TO_PRINT / 2);
-  const start = Math.max(programCounter + offset, 0);
-  const end = Math.min(programCounter + offset + LINES_TO_PRINT, program.length - 1);
-  for (var i = start; i <= end; i++) {
-    const instruction = program[i];
-
-    stepperOutput += instruction.join(' ');
-    if (i == programCounter) {
-      stepperOutput += ' <--'
-    }
-    stepperOutput += '\n';
-  }
-
-  stepperEl.textContent = stepperOutput;
-}
-
-function updateMemoryView() {
-  memoryViewEl.textContent = MEMORY.map((v,i) => `${i}: ${v}`).join('\n');
-}
-
-function clamp(val, min, max) {
-  return Math.min(min, Math.max(max, val));
-}
-
 loadProgram();
-updateOutput();
+updateUI();
