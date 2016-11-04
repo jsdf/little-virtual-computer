@@ -36,7 +36,7 @@ let programCounter = PROGRAM_START;
 let running = false;
 
 // Store a value at a certain address in memory
-function setMem(address, value) {
+function memorySet(address, value) {
   if (address < 0 || address >= TOTAL_MEMORY_SIZE) {
     throw new Error('tried to write to an invalid memory address');
   }
@@ -44,11 +44,17 @@ function setMem(address, value) {
 }
 
 // Get the value which is stored at a certain address in memory
-function getMem(address) {
+function memoryGet(address) {
   if (address < 0 || address >= TOTAL_MEMORY_SIZE) {
     throw new Error('tried to read from an invalid memory address');
   }
   return MEMORY[address];
+}
+
+// Move the program counter forward to the next memory address and return the
+// opcode or data at that location
+function advanceProgramCounter() {
+  return MEMORY[programCounter++];
 }
 
 // These instructions represent the things the CPU can be told to do. We
@@ -59,14 +65,14 @@ function getMem(address) {
 const instructions = {
   // TODO: figure out how to implement this in assembler
   'set_data': function() {
-    // const startAddress = getNextProgramValue();
-    // const length = getNextProgramValue();
+    // const startAddress = advanceProgramCounter();
+    // const length = advanceProgramCounter();
     // let currentAddress = startAddress;
     // for (var currentAddress = startAddress; currentAddress < length; currentAddress++) {
     //   MEMORY[currentAddress]
     // }
     // for (const value of data) {
-    //   setMem(currentAddress, data);
+    //   memorySet(currentAddress, data);
     //   currentAddress++;
     // }
   },
@@ -74,20 +80,20 @@ const instructions = {
   // program code can initialize values in memory with whatever values they
   // need.
   'set_value': function() {
-    const address = getNextProgramValue();
-    const value = getNextProgramValue();
-    setMem(address, value);
+    const address = advanceProgramCounter();
+    const value = advanceProgramCounter();
+    memorySet(address, value);
   },
-  // add the value at the address 'a' with the value at the address 'b' and
-  // store them at the address 'out'
+  // add the value at the 'a' address with the value at the 'b' address and
+  // store them at the 'result' address
   'add': function() {
-    const aAddress = getNextProgramValue();
-    const bAddress = getNextProgramValue();
-    const outAddress = getNextProgramValue();
-    const aValue = getMem(aAddress);
-    const bValue = getMem(bAddress);
-    const outValue = aValue + bValue;
-    setMem(outAddress, outValue);
+    const aAddress = advanceProgramCounter();
+    const bAddress = advanceProgramCounter();
+    const resultAddress = advanceProgramCounter();
+    const aValue = memoryGet(aAddress);
+    const bValue = memoryGet(bAddress);
+    const resultValue = aValue + bValue;
+    memorySet(resultAddress, resultValue);
   },
   'label': function() {
     // don't actually do anything for the 'label' instruction, it's just here to
@@ -123,11 +129,6 @@ Object.keys(instructions).forEach((instructionName, index) => {
 for (var i = 0; i < TOTAL_MEMORY_SIZE; i++) {
   MEMORY[i] = 0;
 }
-
-// We'll keep a map of the 'label' instructions in the program so we can
-// jump to them later on. More on this later.
-// TODO: implement labels in assembler
-const labelLocations = {};
 
 // We use a simple text-based language to input our program, which we will
 // convert into the array representation described earlier. This is our
@@ -168,7 +169,17 @@ function parseProgramText(programText) {
 // store in the computer's memory, and load them in there.
 function assembleAndLoadProgram(programInstructions) {
   let loadingAddress = PROGRAM_START;
+  const labelReferences = {};
+  const labelAddresses = {};
   for (const instruction of programInstructions) {
+    // 'label' is a special case – it's not really an instruction which the CPU
+    // understands. Instead, it's a marker for the location of the next
+    // instruction, which we can substitute for the actual location once we know
+    // where this instruction will be loaded into memory, and where else it is
+    // referred to in the program
+    if (instruction[0] === 'label') {
+      labelAddresses[instruction[1]] = loadingAddress;
+    }
     MEMORY[loadingAddress++] = instructionsToOpcodes.get(instruction[0]);
     for (var i = 1; i < instruction.length; i++) {
       MEMORY[loadingAddress++] = instruction[i];
@@ -176,14 +187,8 @@ function assembleAndLoadProgram(programInstructions) {
   }
 }
 
-function getNextProgramValue() {
-  return MEMORY[programCounter++];
-}
-
-// Advance the program counter and run the instruction at the new position.
-// Returns true once the program is finished.
 function step() {
-  const opcode = getNextProgramValue();
+  const opcode = advanceProgramCounter();
   const instructionName = opcodesToInstructions.get(opcode);
   if (!instructionName) {
     throw new Error(`Unknown opcode '${opcode}'. Did you keep running past the end?`);
@@ -197,13 +202,15 @@ function stepOnce() {
   running = false;
   updateUI(MEMORY, programCounter, program);
 }
+
 function runToEnd() {
   running = true;
-  while(running) {
-    step();
-  }
 
+  step();
   updateUI(MEMORY, programCounter, program);
+  if (running) {
+    setTimeout(runToEnd, 300);
+  }
 }
 
 function loadProgram() {
