@@ -1,39 +1,55 @@
+// --- MEMORY ---
 
-// We are going to use an array to simulate computer memory. We can store a
-// number value at each position in the array, and we will use a number value to
-// access each slot in the array (we'll call these 'memory addresses').
-// 
-// Real computers have memory which can be read as individual bytes, as well as
-// in larger or smaller chunks, and their addresses and values are usually shown
-// as hexadecimal (base-16) form, but we are going to represent addresses and
-// values as decimal (base-10) numbers, so there's one less thing to know about
-// at this point.
+/*
+We are going to use an array to simulate computer memory. We can store a number
+value at each position in the array, and we will use a number value to access
+each slot in the array (we'll call these array indexes 'memory addresses').
+
+Real computers have memory which can be read and written as individual bytes,
+and also in larger or smaller chunks. In real computers memory addresses and
+values are usually shown as hexadecimal (base-16) form, due to the fact that
+hexadecimal is a concise alternative to binary, which 'lines up' nicely with
+binary: a 1 digit hexadecimal number can represent exactly all of the values
+which a 4 digit binary number ca. However, we are going to represent addresses
+and values as decimal (base-10) numbers, so there's one less thing to know about
+at this point.
+*/
 const MEMORY = [];
 
-// Here we have the total amount of array slots (or memory addresses) we are
-// going to have at which to store data values, and program code too, because
-// at the hardware level, program code is just another form of data stored in
-// memory.
-const TOTAL_MEMORY_SIZE = 1000;
+/*
+Here we have the total amount of array slots (or memory addresses) we are
+going to have at which to store data values.
 
-// The program will be loaded into memory starting at this slot.
-const PROGRAM_START = 600;
+The program code will also be loaded into these slots, and when the CPU starts
+running, it will begin reading each instruction of the program from memory and
+executing it. At the hardware level, program code is just another form of data
+stored in memory.
 
-// As we move through our program, we need to keep track of where we are up to.
-// The program counter contains a memory address pointing to the location of the
-// program instruction we are currently executing.
-// In a real computer, there is a small piece of memory inside the CPU which
-// holds this information, called the 'program counter'. The program counter is
-// one of several 'registers', which are basically tiny pieces of memory built
-// right into the CPU, which just hold one value at a time, but can be accessed
-// very quickly.
-let programCounter = PROGRAM_START;
+We'll use the first 1000 (0 - 999) slots as working space for our code to use.
+The next 1000 (1000 - 1999) we'll load our program code into, and that's where
+it will be executed from.
+The final 1000 slots will be used to communicate with the input and output (I/O)
+devices.
+2000: the keycode of the key which is currently pressed
+2001, 2002: the x and y position of the mouse within the screen.
+2003 - 2099: unused
+2100 - 2999: The color values of the pixels of the 30x30 pixel screen, row by
+  row, from the top left. For example, the top row uses slots 2100 - 2129, and
+  the bottom row uses slots 2970 - 3000.
+*/
+const TOTAL_MEMORY_SIZE = 3000;
+const WORKING_MEMORY_START = 0;
+const WORKING_MEMORY_END = 1000;
+const PROGRAM_MEMORY_START = 1000;
+const PROGRAM_MEMORY_END = 2000;
+const KEYCODE_ADDRESS = 2000;
+const MOUSE_X_ADDRESS = 2001;
+const MOUSE_Y_ADDRESS = 2002;
+const VIDEO_MEMORY_START = 2100;
+const VIDEO_MEMORY_END = 3000;
 
-// We also need to keep track of whether the CPU is running or not. The 'break'
-// instruction, which is like 'debugger' in Javascript, will be implemented by
-// setting this to false. We'll automatically put one at the end of any program
-// we load so the CPU knows where to stop.
-let running = false;
+// The program will be loaded into the region of memory starting at this slot.
+const PROGRAM_START = 1000;
 
 // Store a value at a certain address in memory
 function memorySet(address, value) {
@@ -51,31 +67,47 @@ function memoryGet(address) {
   return MEMORY[address];
 }
 
-// Move the program counter forward to the next memory address and return the
-// opcode or data at that location
+// --- CPU ---
+
+/*
+As we move through our program, we need to keep track of where we are up to.
+The program counter contains a memory address pointing to the location of the
+program instruction we are currently executing.
+In a real computer, there is a small piece of memory inside the CPU which
+holds this information, called the 'program counter'. The program counter is
+one of several 'registers', which are basically tiny pieces of memory built
+right into the CPU, which just hold one value at a time, but can be accessed
+very quickly.
+*/
+let programCounter = PROGRAM_START;
+
+/*
+We also need to keep track of whether the CPU is running or not. The 'break'
+instruction, which is like 'debugger' in Javascript, will be implemented by
+setting this to false. This will cause the simulator to stop, but we can still
+resume the program
+The 'halt' instruction will tell the CPU that we are at the end of the program,
+so it should stop executing instructions, and can't be resumed.
+*/
+let running = false;
+let halted = false;
+
+/*
+Move the program counter forward to the next memory address and return the
+opcode or data at that location
+*/
 function advanceProgramCounter() {
-  return MEMORY[programCounter++];
+  return memoryGet(programCounter++);
 }
 
-// These instructions represent the things the CPU can be told to do. We
-// implement them here with code, but a real CPU would have circuitry
-// implementing each one of these possible actions, which include things like
-// loading data from memory, comparing it, operating on and combining it, and
-// storing it back into memory.
+/*
+These instructions represent the things the CPU can be told to do. We
+implement them here with code, but a real CPU would have circuitry
+implementing each one of these possible actions, which include things like
+loading data from memory, comparing it, operating on and combining it, and
+storing it back into memory.
+*/
 const instructions = {
-  // TODO: figure out how to implement this in assembler
-  'set_data': function() {
-    // const startAddress = advanceProgramCounter();
-    // const length = advanceProgramCounter();
-    // let currentAddress = startAddress;
-    // for (var currentAddress = startAddress; currentAddress < length; currentAddress++) {
-    //   MEMORY[currentAddress]
-    // }
-    // for (const value of data) {
-    //   memorySet(currentAddress, data);
-    //   currentAddress++;
-    // }
-  },
   // We expose our memory setting function to be used in our program so that the
   // program code can initialize values in memory with whatever values they
   // need.
@@ -104,38 +136,120 @@ const instructions = {
   },
   'break': function() {
     running = false;
-  }
+  },
+  'halt': function() {
+    running = false;
+    halted = true;
+  },
 };
 
-// we'll set up a mapping between our instruction names and the numerical values
-// we will turn them into when we assemble the program. It is these numerical
-// values which will be interpreted by our simulated CPU as it runs
-// the program.
+/*
+We'll set up a mapping between our instruction names and the numerical values
+we will turn them into when we assemble the program. It is these numerical
+values which will be interpreted by our simulated CPU as it runs the program.
+*/
 const instructionsToOpcodes = new Map();
 const opcodesToInstructions = new Map();
-
 Object.keys(instructions).forEach((instructionName, index) => {
-  const opcode = index + 100; // opcodes start at 100
+  // We assign numerical values to each of the instructions. We'll start the
+  // numbering at 10000 to make the values a bit more distinctive when we see
+  // them in the memory viewer.
+  const opcode = index + 10000;
   instructionsToOpcodes.set(instructionName, opcode);
   opcodesToInstructions.set(opcode, instructionName);
 });
 
-// In a real computer, memory addresses which have never had any value set are
-// considered 'uninitialized', and might contain any garbage value, but to keep
-// our simulation simple we're going to initialize every location with the value
-// 0. However, just like in a real computer, in our simulation it is possible
-// for us to mistakenly read from the wrong place in memory if we have a bug in
-// our simulated program where we get the memory address wrong.
-for (var i = 0; i < TOTAL_MEMORY_SIZE; i++) {
-  MEMORY[i] = 0;
+/*
+Advances through the program by one instruction, getting input from the input
+devices (keyboard, mouse), executing the instruction, then writing output to the
+output devices (screen, audio).
+*/
+function step() {
+  const opcode = advanceProgramCounter();
+  const instructionName = opcodesToInstructions.get(opcode);
+  if (!instructionName) {
+    throw new Error(`Unknown opcode '${opcode}'`);
+  }
+  instructions[instructionName]();
+
+  drawScreen();
 }
 
-// We use a simple text-based language to input our program, which we will
-// convert into the array representation described earlier. This is our
-// equivalent of an assembly language.
-// We parse the program text into our array form by splitting the text into
-// lines, then splitting those lines into tokens (words), which gives us to an
-// instruction name and arguments for that instruction, from each line.
+
+// --- DISPLAY ---
+
+const SCREEN_WIDTH = 30;
+const SCREEN_HEIGHT = 30;
+
+/*
+To reduce the amount of memory required to contain the data for each pixel on
+the screen, we're going to use a lookup table mapping color IDs to RGB colors.
+This is sometimes called a 'color palette'.
+
+This means that rather than having to store a red, green and blue value for each
+color, in our simulated program we can just use the ID of the color we want to
+use for each pixel, and when the simulated video hardware draws the screen it
+can look up the actual RGB color values to use for each pixel rendered.
+
+The drawback of approach is that the colors you can use are much more limited,
+as you can only use a color if it's in the palette. It also means you can't
+simply lighten or darken colors using math (unless you use a clever layout of
+your palette).
+*/
+
+const COLOR_PALETTE = {
+  0:  [  0,  0,  0], // Black
+  1:  [255,255,255], // White
+  2:  [255,  0,  0], // Red
+  3:  [  0,255,  0], // Lime 
+  4:  [  0,  0,255], // Blue 
+  5:  [255,255,  0], // Yellow 
+  6:  [  0,255,255], // Cyan/Aqua
+  7:  [255,  0,255], // Magenta/Fuchsia
+  8:  [192,192,192], // Silver 
+  9:  [128,128,128], // Gray 
+  10: [128,  0,  0], // Maroon 
+  11: [128,128,  0], // Olive
+  12: [  0,128,  0], // Green
+  13: [128,  0,128], // Purple 
+  14: [  0,128,128], // Teal 
+  15: [  0,  0,128], // Navy 
+};
+
+/*
+Read the pixel values from video memory, look them up in our color palette, and
+convert them to the format which the Canvas 2D API requires: an array of RGBA
+values for each pixel. This format uses 4 consecutive array slots to represent
+each pixel, one for each of the RGBA channels (red, green, blue, alpha).
+
+We don't need to vary the alpha (opacity) values, so we'll just set them to 255
+(full opacity) for every pixel.
+*/
+const VIDEO_MEMORY_LENGTH = VIDEO_MEMORY_END - VIDEO_MEMORY_START;
+function drawScreen() {
+  const pixelsRGBA = new Uint8ClampedArray(SCREEN_WIDTH * SCREEN_HEIGHT * 4);
+  for (var i = 0; i < VIDEO_MEMORY_LENGTH; i++) {
+    const pixelColorId = MEMORY[VIDEO_MEMORY_START + i];
+    const colorRGB = COLOR_PALETTE[pixelColorId || 0];
+    pixelsRGBA[i * 4] = colorRGB[0];
+    pixelsRGBA[i * 4 + 1] = colorRGB[1];
+    pixelsRGBA[i * 4 + 2] = colorRGB[2];
+    pixelsRGBA[i * 4 + 3] = 255; // full opacity
+  }
+  // actually write pixels to the canvas (scaled up)
+  putScreenPixelsToCanvas(pixelsRGBA);
+}
+
+// --- ASSEMBLER ---
+
+/*
+We use a simple text-based language to input our program, which we will
+convert into the array representation described earlier. This is our
+equivalent of an assembly language.
+We parse the program text into our array form by splitting the text into
+lines, then splitting those lines into tokens (words), which gives us to an
+instruction name and arguments for that instruction, from each line.
+*/
 function parseProgramText(programText) {
   const programInstructions = [];
   const lines = programText.split('\n');
@@ -159,7 +273,7 @@ function parseProgramText(programText) {
       programInstructions.push(instruction);
     }
   }
-  programInstructions.push(['break']);
+  programInstructions.push(['halt']);
   return programInstructions;
 }
 
@@ -187,27 +301,20 @@ function assembleAndLoadProgram(programInstructions) {
   }
 }
 
-function step() {
-  const opcode = advanceProgramCounter();
-  const instructionName = opcodesToInstructions.get(opcode);
-  if (!instructionName) {
-    throw new Error(`Unknown opcode '${opcode}'. Did you keep running past the end?`);
-  }
-  instructions[instructionName]();
-}
+// --- SIMULATION CONTROL ---
 
 function stepOnce() {
   running = true;
   step();
   running = false;
-  updateUI(MEMORY, programCounter, program);
+  updateUI();
 }
 
 function runToEnd() {
   running = true;
 
   step();
-  updateUI(MEMORY, programCounter, program);
+  updateUI();
   if (running) {
     setTimeout(runToEnd, 300);
   }
@@ -215,64 +322,158 @@ function runToEnd() {
 
 function loadProgram() {
   assembleAndLoadProgram(parseProgramText(getProgramText()));
+  updateProgramMemoryView(MEMORY);
 }
 
 
 function init() {
+  /*
+  In a real computer, memory addresses which have never had any value set are
+  considered 'uninitialized', and might contain any garbage value, but to keep
+  our simulation simple we're going to initialize every location with the value
+  0. However, just like in a real computer, in our simulation it is possible
+  for us to mistakenly read from the wrong place in memory if we have a bug in
+  our simulated program where we get the memory address wrong.
+  */
+  for (var i = 0; i < TOTAL_MEMORY_SIZE; i++) {
+    MEMORY[i] = 0;
+  }
+
   loadProgram();
-  updateUI(MEMORY, programCounter, program);
+  updateUI();
 }
+
+const PROGRAMS = {
+  'RandomPixel':
+`set_value 2100 4`,
+  'Add':
+`set_value 0 4
+set_value 1 4
+add 0 1 2`,
+  'Custom 1': '',
+  'Custom 2': '',
+  'Custom 3': '',
+};
 
 // boring code for rendering user interface of the simulator
 // not really important for understanding how computers work
 
 const LINES_TO_PRINT = 20;
 
-const stepperEl = document.getElementById('stepper');
-const memoryViewEl = document.getElementById('memoryView');
-const programCounterEl = document.getElementById('programCounter');
-const programEl = document.getElementById('program');
+function ge(id) {
+  return document.getElementById(id);
+}
+
+const stepButtonEl = ge('stepButton');
+const runButtonEl = ge('runButton');
+const workingMemoryViewEl = ge('workingMemoryView');
+const programMemoryViewEl = ge('programMemoryView');
+const inputMemoryViewEl = ge('inputMemoryView');
+const videoMemoryViewEl = ge('videoMemoryView');
+const programCounterEl = ge('programCounter');
+const programEl = ge('program');
+const runningEl = ge('running');
+const programSelectorEl = ge('programSelector');
+const canvasEl = ge('canvas');
+const canvasCtx = canvasEl.getContext('2d');
+
+let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixel'; // default
+
+// init program selector
+Object.keys(PROGRAMS).forEach(programName => {
+  const option = document.createElement('option');
+  option.value = programName;
+  option.textContent = programName;
+  programSelectorEl.append(option);
+});
+programSelectorEl.value = selectedProgram;
+selectProgram();
 
 function getProgramText() {
-  return programEl.textContent;
+  return programEl.value;
 }
 
-function updateUI(
-  memory,
-  programCounter,
-  program
-) {
-  programCounterEl.value = programCounter;
-  updateStepper(
-    programCounter,
-    program
-  );
-  updateMemoryView(memory);
+function selectProgram() {
+  selectedProgram = programSelectorEl.value;
+  localStorage.setItem('selectedProgram', selectedProgram);
+  programEl.value =
+    localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram];
 }
 
-function updateStepper(
-  programCounter,
-  program
-) {
-  let stepperOutput = '';
-  const offset = -Math.floor(LINES_TO_PRINT / 2);
-  const start = Math.max(programCounter + offset, 0);
-  const end = Math.min(programCounter + offset + LINES_TO_PRINT, program.length - 1);
-  for (var i = start; i <= end; i++) {
-    const instruction = program[i];
-
-    stepperOutput += instruction.join(' ');
-    if (i == programCounter) {
-      stepperOutput += ' <--'
-    }
-    stepperOutput += '\n';
+function editProgramText() {
+  if (selectedProgram.startsWith('Custom')) {
+    localStorage.setItem(selectedProgram, programEl.value);
   }
-
-  stepperEl.textContent = stepperOutput;
 }
 
-function updateMemoryView(memory) {
-  memoryViewEl.textContent = memory.map((v,i) => `${i}: ${v}`).join('\n');
+function updateUI() {
+  programCounterEl.value = programCounter;
+  if (halted) {
+    runningEl.textContent = 'halted';
+    stepButtonEl.disabled = true;
+    runButtonEl.disabled = true;
+  } else {
+    runningEl.textContent = running ? 'running' : 'paused';
+    stepButtonEl.disabled = false;
+    runButtonEl.disabled = false;
+  }
+  updateWorkingMemoryView(MEMORY);
+  updateInputMemoryView(MEMORY);
+  updateVideoMemoryView(MEMORY);
+}
+
+function updateWorkingMemoryView(memory) {
+  const lines = [];
+  for (var i = WORKING_MEMORY_START; i < WORKING_MEMORY_END; i++) {
+    lines.push(`${i}: ${memory[i]}`);
+  }
+  workingMemoryViewEl.textContent = lines.join('\n');
+}
+
+function updateProgramMemoryView(memory) {
+  const lines = [];
+  for (var i = PROGRAM_MEMORY_START; i < PROGRAM_MEMORY_END; i++) {
+    const instruction = opcodesToInstructions.get(memory[i]);
+    lines.push(`${i}: ${memory[i]} ${instruction || ''}`);
+  }
+  programMemoryViewEl.textContent = lines.join('\n');
+}
+
+function updateInputMemoryView(memory) {
+  inputMemoryViewEl.textContent =
+    `${KEYCODE_ADDRESS}: ${memory[KEYCODE_ADDRESS]} (keycode)
+${MOUSE_X_ADDRESS}: ${memory[MOUSE_X_ADDRESS]} (mouse x)
+${MOUSE_Y_ADDRESS}: ${memory[MOUSE_Y_ADDRESS]} (mouse y)`;
+}
+
+function updateVideoMemoryView(memory) {
+  const lines = [];
+  for (var i = VIDEO_MEMORY_START; i < VIDEO_MEMORY_END; i++) {
+    lines.push(`${i}: ${memory[i]}`);
+  }
+  videoMemoryView.textContent = lines.join('\n');
+}
+
+const PIXEL_SCALE = 20;
+const CANVAS_WIDTH = SCREEN_WIDTH * PIXEL_SCALE;
+const CANVAS_HEIGHT = SCREEN_HEIGHT * PIXEL_SCALE;
+function putScreenPixelsToCanvas(pixelsRGBA) {
+  const imageData = canvasCtx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  // scale our RGBA pixels up and blit (copy) them to the canvas 
+  for (let y = 0; y < CANVAS_HEIGHT; y++) {
+    for (let x = 0; x < CANVAS_WIDTH; x++) {
+      const rowStartOffset = Math.floor(y / PIXEL_SCALE) * SCREEN_WIDTH;
+      const columnOffset = Math.floor(x / PIXEL_SCALE);
+      const index = (rowStartOffset + columnOffset) * 4; // 4 channels (rgba)
+      const indexScaled = (y * CANVAS_WIDTH + x) * 4; // 4 channels (rgba)
+      imageData.data[indexScaled] = pixelsRGBA[index];
+      imageData.data[indexScaled + 1] = pixelsRGBA[index + 1];
+      imageData.data[indexScaled + 2] = pixelsRGBA[index + 2];
+      imageData.data[indexScaled + 3] = pixelsRGBA[index + 3];
+    }
+  }
+  canvasCtx.putImageData(imageData, 0, 0);
 }
 
 function clamp(val, min, max) {

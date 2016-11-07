@@ -5,6 +5,10 @@
 </head>
 <body>
   <style type="text/css">
+    body {
+      font-size: 12px;
+      font-family: sans-serif;
+    }
     label {
       display: block;
     }
@@ -13,26 +17,38 @@
       font-family: monospace;
     }
   </style>
-  <button onclick="stepOnce()">step</button>
-  <button onclick="runToEnd()">run</button>
+  <button id="stepButton" onclick="stepOnce()">step</button>
+  <button id="runButton" onclick="runToEnd()">run</button>
   <button onclick="location.reload()">reset</button>
-  <label>program counter<input id="programCounter"></input></label>
-  current program location:
-  <textarea id="stepper" readonly rows="10" cols="80">
-  </textarea>
-  memory contents:
-  <textarea id="memoryView" readonly rows="10" cols="80">
-  </textarea>
-  <div>
-    <label>
-      program code input:
-    </label>
-<textarea id="program" rows="10" cols="80">
-set_value 0 4
-set_value 1 4
-add 0 1 2
-</textarea>
-    <button onclick="loadProgram()">load program</button>
+  <span id="running"></span>
+  <label>program counter <input id="programCounter"></input></label>
+  <div style="display: flex;">
+    <div style="width: 320px">
+      working memory (slots 0 - 999):
+      <textarea id="workingMemoryView" readonly rows="10" cols="40">
+      </textarea>
+      program memory (slots 1000 - 1999):
+      <textarea id="programMemoryView" readonly rows="10" cols="40">
+      </textarea>
+      input memory (slots 2000 - 2002):
+      <textarea id="inputMemoryView" readonly rows="3" cols="40">
+      </textarea>
+      video memory (slots 2100 - 2999):
+      <textarea id="videoMemoryView" readonly rows="10" cols="40">
+      </textarea>
+      <div>
+        <label>
+          program:
+          <select id="programSelector" onchange="selectProgram()"></select>
+          <button onclick="loadProgram()">load program</button>
+        </label>
+        <textarea id="program" rows="10" cols="40" onchange="editProgramText()">
+        </textarea>
+      </div>
+    </div>
+    <div style="flex: 1">
+      <canvas id="canvas" width="600" height="600"></canvas>
+    </div>
   </div>
   <script type="text/javascript" src="./computer1.js"></script>
 </body>
