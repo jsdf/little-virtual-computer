@@ -17,11 +17,12 @@
       font-family: monospace;
     }
   </style>
-  <button id="stepButton" onclick="stepOnce()">step</button>
+  <button onclick="init()">load program/reset</button>
   <button id="runButton" onclick="runToEnd()">run</button>
-  <button onclick="location.reload()">reset</button>
+  <button id="stepButton" onclick="stepOnce()">step</button>
   <span id="running"></span>
   <label>program counter <input id="programCounter"></input></label>
+  <label>speed <input id="speed" type="range" min="-500" max="0" value="0" onchange="setSpeed()"></input></label>
   <div style="display: flex;">
     <div style="width: 320px">
       working memory (slots 0 - 999):
@@ -40,7 +41,6 @@
         <label>
           program:
           <select id="programSelector" onchange="selectProgram()"></select>
-          <button onclick="loadProgram()">load program</button>
         </label>
         <textarea id="program" rows="10" cols="40" onchange="editProgramText()">
         </textarea>

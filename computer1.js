@@ -32,7 +32,9 @@ The final 1000 slots will be used to communicate with the input and output (I/O)
 devices.
 2000: the keycode of the key which is currently pressed
 2001, 2002: the x and y position of the mouse within the screen.
-2003 - 2099: unused
+2003: mouse button status (0 = up, 1 = down)
+2004: a random number which changes before every instruction
+2005 - 2099: unused
 2100 - 2999: The color values of the pixels of the 30x30 pixel screen, row by
   row, from the top left. For example, the top row uses slots 2100 - 2129, and
   the bottom row uses slots 2970 - 3000.
@@ -45,6 +47,8 @@ const PROGRAM_MEMORY_END = 2000;
 const KEYCODE_ADDRESS = 2000;
 const MOUSE_X_ADDRESS = 2001;
 const MOUSE_Y_ADDRESS = 2002;
+const MOUSE_BUTTON_ADDRESS = 2003;
+const RANDOM_NUMBER_ADDRESS = 2004
 const VIDEO_MEMORY_START = 2100;
 const VIDEO_MEMORY_END = 3000;
 
@@ -53,6 +57,9 @@ const PROGRAM_START = 1000;
 
 // Store a value at a certain address in memory
 function memorySet(address, value) {
+  if (Number.isNaN(value)) {
+    throw new Error(`tried to write to an invalid value at ${address}`);
+  }
   if (address < 0 || address >= TOTAL_MEMORY_SIZE) {
     throw new Error('tried to write to an invalid memory address');
   }
@@ -65,6 +72,27 @@ function memoryGet(address) {
     throw new Error('tried to read from an invalid memory address');
   }
   return MEMORY[address];
+}
+
+/*
+We're going to use negative address values as a way of flagging 'indirect
+addresses', also known as 'pointers', so if the address is negative it should be
+used to look up another address which will actually be used for the memory access.
+*/
+function memoryGetDereferenced(address) {
+  let directAddress = address;
+  if (Math.sign(address) === -1) {
+    directAddress = memoryGet(address + 10000);
+  }
+  return memoryGet(directAddress);
+}
+
+function memorySetDereferenced(address, value) {
+  let directAddress = address;
+  if (Math.sign(address) === -1) {
+    directAddress = memoryGet(address + 10000);
+  }
+  memorySet(directAddress, value);
 }
 
 // --- CPU ---
@@ -97,6 +125,9 @@ Move the program counter forward to the next memory address and return the
 opcode or data at that location
 */
 function advanceProgramCounter() {
+  if (programCounter < PROGRAM_MEMORY_START || programCounter >= PROGRAM_MEMORY_END) {
+    throw new Error(`program counter outside valid program memory region at ${programCounter}`);
+  }
   return memoryGet(programCounter++);
 }
 
@@ -106,40 +137,226 @@ implement them here with code, but a real CPU would have circuitry
 implementing each one of these possible actions, which include things like
 loading data from memory, comparing it, operating on and combining it, and
 storing it back into memory.
+
+We assign numerical values called 'opcodes' to each of the instructions. When
+our program is 'assembled' from the program code text, the version of the
+program that we actually load into memory will use these numeric codes to refer
+to the CPU instructions in place of the textual names as a numeric value is a
+more efficient representation, especially as computers only directly understand
+numbers, whereas text is an abstraction on top of number values.
+
+We'll make the opcodes numbers starting at 9000 to make the values a bit more
+distinctive when we see them in the memory viewer. We'll include some extra info
+about each of the instructions so our simulator user interface can show it
+alongside the 'disassembled' view of the program code in memory.
 */
 const instructions = {
-  // We expose our memory setting function to be used in our program so that the
-  // program code can initialize values in memory with whatever values they
-  // need.
-  'set_value': function() {
-    const address = advanceProgramCounter();
-    const value = advanceProgramCounter();
-    memorySet(address, value);
+  set_value: {
+    opcode: 9000,
+    description: 'set memory at address to given value',
+    operands: ['address', 'value'],
+    execute(address, value) {
+      memorySetDereferenced(address, value);
+    },
   },
-  // add the value at the 'a' address with the value at the 'b' address and
-  // store them at the 'result' address
-  'add': function() {
-    const aAddress = advanceProgramCounter();
-    const bAddress = advanceProgramCounter();
-    const resultAddress = advanceProgramCounter();
-    const aValue = memoryGet(aAddress);
-    const bValue = memoryGet(bAddress);
-    const resultValue = aValue + bValue;
-    memorySet(resultAddress, resultValue);
+  add_addr_addr: {
+    opcode: 9010,
+    description: `add the value at the 'a' address with the value at the 'b'
+address and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (address)', 'result (address)'],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      const result = a + b;
+      memorySetDereferenced(resultAddress, result);
+    },
   },
-  'label': function() {
-    // don't actually do anything for the 'label' instruction, it's just here to
-    // mark a place in the program so that we can jump to it as needed
+  add_addr_val: {
+    opcode: 9011,
+    description: `add the value at the 'a' address with the value 'b' and store
+the result at the 'result' address`,
+    operands: ['a (address)', 'b (value)', 'result (address)'],
+    execute(aAddress, b, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const result = a + b;
+      memorySetDereferenced(resultAddress, result);
+    },
   },
-  'jump_to': function() {
-
+  subtract_addr_addr: {
+    opcode: 9012,
+    description: `from the value at the 'a' address, subtract the value at the
+'b' address and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (address)', 'result (address)'],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      const result = a - b;
+      memorySetDereferenced(resultAddress, result);
+    },
   },
-  'break': function() {
-    running = false;
+  subtract_addr_val: {
+    opcode: 9012,
+    description: `from the value at the 'a' address, subtract the value 'b' and
+store the result at the 'result' address`,
+    operands: ['a (address)', 'b (value)', 'result (address)'],
+    execute(aAddress, b, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const result = a - b;
+      memorySetDereferenced(resultAddress, result);
+    },
   },
-  'halt': function() {
-    running = false;
-    halted = true;
+  multiply_addr_addr: {
+    opcode: 9013,
+    description: `multiply the value at the 'a' address and the value at the 'b'
+address and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (address)', 'result (address)'],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      const result = a * b;
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  multiply_addr_val: {
+    opcode: 9014,
+    description: `multiply the value at the 'a' address and the value 'b' and
+store the result at the 'result' address`,
+    operands: ['a (address)', 'b (value)', 'result (address)'],
+    execute(aAddress, b, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const result = a * b;
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  divide_addr_addr: {
+    opcode: 9015,
+    description: `integer divide the value at the 'a' address by the value at
+the 'b' address and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (address)', 'result (address)'],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      if (b === 0) throw new Error('tried to divide by zero');
+      const result = Math.floor(a / b);
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  divide_addr_val: {
+    opcode: 9016,
+    description: `integer divide the value at the 'a' address by the value 'b'
+and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (value)', 'result (address)'],
+    execute(aAddress, b, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      if (b === 0) throw new Error('tried to divide by zero');
+      const result = Math.floor(a / b);
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  modulo_addr_addr: {
+    opcode: 9017,
+    description: `get the value at the 'a' address modulo the value at the 'b'
+address and store the result at the 'result' address`,
+    operands: ['a (address)', 'b (address)', 'result (address)'],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      if (b === 0) throw new Error('tried to modulo by zero');
+      const result = a % b;
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  modulo_addr_val: {
+    opcode: 9018,
+    description: `get the value at the 'a' address modulo the value 'b' and
+store the result at the 'result' address`,
+    operands: ['a (address)', 'b (value)', 'result (address)'],
+    execute(aAddress, b, resultAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const result = a % b;
+      if (b === 0) throw new Error('tried to modulo by zero');
+      memorySetDereferenced(resultAddress, result);
+    },
+  },
+  'jump_to':  {
+    opcode: 9100,
+    description: `set the program counter to the address of the label specified,
+so the program continues from there`,
+    operands: ['destination (label)'],
+    execute(labelAddress) {
+      programCounter = labelAddress;
+    },
+  },
+  'branch_if_equal_addr_addr':  {
+    opcode: 9101,
+    description: `if the value at address 'a' is equal to the value at address
+'b', set the program counter to the address of the label specified, so the
+program continues from there`,
+    operands: ['a (address)', 'b (address)', 'destination (label)'],
+    execute(aAddress, bAddress, labelAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      if (a === b)  {
+        programCounter = labelAddress;
+      }
+    },
+  },
+  'branch_if_equal_addr_val':  {
+    opcode: 9102,
+    description: `if the value at address 'a' is equal to the value 'b', set the
+program counter to the address of the label specified, so the program continues
+from there`,
+    operands: ['a (address)', 'b (value)', 'destination (label)'],
+    execute(aAddress, b, labelAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      if (a === b)  {
+        programCounter = labelAddress;
+      }
+    },
+  },
+  'branch_if_not_equal_addr_addr':  {
+    opcode: 9103,
+    description: `if the value at address 'a' is not equal to the value at
+address 'b', set the program counter to the address of the label specified, so
+the program continues from there`,
+    operands: ['a (address)', 'b (address)', 'destination (label)'],
+    execute(aAddress, bAddress, labelAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      const b = memoryGetDereferenced(bAddress);
+      if (a !== b)  {
+        programCounter = labelAddress;
+      }
+    },
+  },
+  'branch_if_not_equal_addr_val':  {
+    opcode: 9104,
+    description: `if the value at address 'a' is not equal to the value 'b', set
+the program counter to the address of the label specified, so the program
+continues from there`,
+    operands: ['a (address)', 'b (value)', 'destination (label)'],
+    execute(aAddress, b, labelAddress) {
+      const a = memoryGetDereferenced(aAddress);
+      if (a !== b)  {
+        programCounter = labelAddress;
+      }
+    },
+  },
+  'break': {
+    opcode: 9998,
+    description: 'pause program execution, so it must be resumed via simulator UI',
+    operands: [],
+    execute() {
+      running = false;
+    },
+  },
+  'halt': {
+    opcode: 9999,
+    description: 'end program execution, requiring the simulator to be reset to start again',
+    operands: [],
+    execute() {
+      running = false;
+      halted = true;
+    },
   },
 };
 
@@ -151,10 +368,7 @@ values which will be interpreted by our simulated CPU as it runs the program.
 const instructionsToOpcodes = new Map();
 const opcodesToInstructions = new Map();
 Object.keys(instructions).forEach((instructionName, index) => {
-  // We assign numerical values to each of the instructions. We'll start the
-  // numbering at 10000 to make the values a bit more distinctive when we see
-  // them in the memory viewer.
-  const opcode = index + 10000;
+  const opcode = instructions[instructionName].opcode;
   instructionsToOpcodes.set(instructionName, opcode);
   opcodesToInstructions.set(opcode, instructionName);
 });
@@ -170,7 +384,11 @@ function step() {
   if (!instructionName) {
     throw new Error(`Unknown opcode '${opcode}'`);
   }
-  instructions[instructionName]();
+
+  // read as many values from memory as the instruction takes as operands and
+  // execute the instruction with those operands
+  const operands = instructions[instructionName].operands.map(advanceProgramCounter);
+  instructions[instructionName].execute.apply(null, operands);
 
   drawScreen();
 }
@@ -243,60 +461,147 @@ function drawScreen() {
 // --- ASSEMBLER ---
 
 /*
-We use a simple text-based language to input our program, which we will
-convert into the array representation described earlier. This is our
-equivalent of an assembly language.
-We parse the program text into our array form by splitting the text into
-lines, then splitting those lines into tokens (words), which gives us to an
-instruction name and arguments for that instruction, from each line.
+We use a simple text-based language to input our program. This is our 'assembly
+language'. We need to convert it into a form which is made up of only numerical
+values so we can load it into our computer's memory. This is a two step process:
+
+1. parse program text into an array of objects representing our instructions and
+  their operands.
+2. convert the objects into numeric values to be interpreted by the CPU. This is
+  our 'machine code'.
+
+We parse the program text into tokens by splitting the text into lines, then
+splitting those lines into tokens (words), which gives us to an instruction name
+and operands for that instruction, from each line.
 */
+
+// we'll keep a map of instructions which take a label as an operand so we
+// know when to substitute an operand for the corresponding label address
+const instructionsLabelOperands = new Map();
+Object.keys(instructions).forEach(name => {
+  const labelOperandIndex = instructions[name].operands.findIndex(operand =>
+    operand.includes('(label)')
+  );
+  if (labelOperandIndex > -1) {
+    instructionsLabelOperands.set(name, labelOperandIndex);
+  }
+});
+
 function parseProgramText(programText) {
   const programInstructions = [];
   const lines = programText.split('\n');
   for (const line of lines) {
-    const instruction = [];
+    const instruction = {name: null, operands: []};
     let tokens = line.split(' ');
     for (const token of tokens) {
       // skip empty tokens
       if (token == null || token == "") {
         continue;
       }
+      // skip rest of the line for comments
+      if (token[0] === ';') {
+        break;
+      }
       // first token
-      if (instruction.length == 0) {
-        instruction.push(token); // instruction name token
+      if (!instruction.name) {
+        // special case for labels
+        if (token.endsWith(':')) {
+          instruction.name = 'label';
+          instruction.operands.push(token.slice(0, token.length - 1));
+          break;
+        }
+
+        instruction.name = token; // instruction name token
       } else {
-        instruction.push(parseInt(token, 0)); // turn token text into Number value
+        // label used as operand
+        if (instructionsLabelOperands.get(instruction.name) === instruction.operands.length) {
+          instruction.operands.push(token);
+          continue;
+        }
+
+        let indirectAddress = false;
+        if (token.startsWith('*')) {
+          indirectAddress = true;
+        }
+        // Turn token text into Number value.
+        let number = parseInt(indirectAddress ? token.slice(1) : token, 10);
+        // If the token represents an indirect address, flag that by making it a
+        // negative value starting at -10000
+        number = number - (indirectAddress ? 10000 : 0);
+
+        if (Number.isNaN(number)) {
+          throw new Error(`couldn't parse operand ${token}`);
+        }
+
+        instruction.operands.push(number);
       }
     }
+
+    // sanity check number of operands given
+    if (instruction.name && instruction.name !== 'label') {
+      const expectedOperands = instructions[instruction.name].operands;
+      if (instruction.operands.length !== expectedOperands.length) {
+        throw new Error(`Wrong number of operands for instruction ${instruction.name}
+got ${instruction.operands.length}, expected ${expectedOperands.length}
+at line '${line}'`
+        );
+      }
+    }
+
     //  if instruction was found on this line, add it to the program
-    if (instruction.length) {
+    if (instruction.name) {
       programInstructions.push(instruction);
     }
   }
-  programInstructions.push(['halt']);
+  programInstructions.push({name: 'halt', operands: []});
   return programInstructions;
 }
 
-// Having parsed our program text into an array, with each item itself being an
-// array containing tokens representing the instruction name followed by the
-// arguments to the instruction, we need to turn those tokens into values we can
-// store in the computer's memory, and load them in there.
+/*
+Having parsed our program text into an array of objects containing instruction
+name and the operands to the instruction, we need to turn those objects into
+numeric values we can store in the computer's memory, and load them in there.
+*/
 function assembleAndLoadProgram(programInstructions) {
-  let loadingAddress = PROGRAM_START;
-  const labelReferences = {};
+  // 'label' is a special case – it's not really an instruction which the CPU
+  // understands. Instead, it's a marker for the location of the next
+  // instruction, which we can substitute for the actual location once we know
+  // the memory locations in the assembled program which the labels refer to.
   const labelAddresses = {};
+  let labelAddress = PROGRAM_START;
   for (const instruction of programInstructions) {
-    // 'label' is a special case – it's not really an instruction which the CPU
-    // understands. Instead, it's a marker for the location of the next
-    // instruction, which we can substitute for the actual location once we know
-    // where this instruction will be loaded into memory, and where else it is
-    // referred to in the program
-    if (instruction[0] === 'label') {
-      labelAddresses[instruction[1]] = loadingAddress;
+    if (instruction.name === 'label') {
+      const labelName = instruction.operands[0];
+      labelAddresses[labelName] = labelAddress;
+    } else {
+      // advance labelAddress by the length of the instruction and its operands
+      labelAddress += 1 + instruction.operands.length;
     }
-    MEMORY[loadingAddress++] = instructionsToOpcodes.get(instruction[0]);
-    for (var i = 1; i < instruction.length; i++) {
-      MEMORY[loadingAddress++] = instruction[i];
+  }
+
+  // load instructions and operands into memory
+  let loadingAddress = PROGRAM_START;
+  for (const instruction of programInstructions) {
+    if (instruction.name === 'label') {
+      continue;
+    }
+    const opcode = instructionsToOpcodes.get(instruction.name);
+    if (!opcode) {
+      throw new Error(`No opcode found for instruction '${instruction.name}'`);
+    }
+    MEMORY[loadingAddress++] = opcode;
+    for (var i = 0; i < instruction.operands.length; i++) {
+      if (instructionsLabelOperands.has(instruction.name)) {
+        if (instructionsLabelOperands.get(instruction.name) === i) {
+          const labelAddress = labelAddresses[instruction.operands[i]];
+          if (!labelAddress) {
+            throw new Error(`couldn't find label ${instruction.operands[i]}`);
+          }
+          MEMORY[loadingAddress++] = labelAddress;
+        }
+      } else {
+        MEMORY[loadingAddress++] = instruction.operands[i];
+      }
     }
   }
 }
@@ -310,21 +615,16 @@ function stepOnce() {
   updateUI();
 }
 
+let cyclePeriod = 0;
 function runToEnd() {
   running = true;
 
   step();
   updateUI();
   if (running) {
-    setTimeout(runToEnd, 300);
+    setTimeout(runToEnd, cyclePeriod);
   }
 }
-
-function loadProgram() {
-  assembleAndLoadProgram(parseProgramText(getProgramText()));
-  updateProgramMemoryView(MEMORY);
-}
-
 
 function init() {
   /*
@@ -339,17 +639,33 @@ function init() {
     MEMORY[i] = 0;
   }
 
-  loadProgram();
+  assembleAndLoadProgram(parseProgramText(getProgramText()));
+
+  programCounter = PROGRAM_START;
+  halted = false;
+  drawScreen();
+  updateProgramMemoryView(MEMORY);
   updateUI();
 }
 
+// --- BUILT-IN PROGRAMS ---
+
 const PROGRAMS = {
-  'RandomPixel':
-`set_value 2100 4`,
   'Add':
 `set_value 0 4
 set_value 1 4
 add 0 1 2`,
+  'RandomPixels':
+`set_value 0 2100 ; use addr 0 to store pointer to current screen pixel
+
+FillScreenLoop:
+; modulo random value by number of colors in palette to get a color value,
+; and write it to current screen pixel, eg. the address pointed to by address 0
+modulo_addr_val 2004 16 *0
+add_addr_val 0 1 0 ; increment pointer to point to next screen pixel address
+branch_if_not_equal_addr_val 0 3000 FillScreenLoop
+halt
+`,
   'Custom 1': '',
   'Custom 2': '',
   'Custom 3': '',
@@ -364,6 +680,7 @@ function ge(id) {
   return document.getElementById(id);
 }
 
+const speedEl = ge('speed');
 const stepButtonEl = ge('stepButton');
 const runButtonEl = ge('runButton');
 const workingMemoryViewEl = ge('workingMemoryView');
@@ -406,6 +723,10 @@ function editProgramText() {
   }
 }
 
+function setSpeed() {
+  cyclePeriod = -parseInt(speedEl.value, 10);
+}
+
 function updateUI() {
   programCounterEl.value = programCounter;
   if (halted) {
@@ -443,7 +764,8 @@ function updateInputMemoryView(memory) {
   inputMemoryViewEl.textContent =
     `${KEYCODE_ADDRESS}: ${memory[KEYCODE_ADDRESS]} (keycode)
 ${MOUSE_X_ADDRESS}: ${memory[MOUSE_X_ADDRESS]} (mouse x)
-${MOUSE_Y_ADDRESS}: ${memory[MOUSE_Y_ADDRESS]} (mouse y)`;
+${MOUSE_Y_ADDRESS}: ${memory[MOUSE_Y_ADDRESS]} (mouse y)
+${MOUSE_BUTTON_ADDRESS}: ${memory[MOUSE_BUTTON_ADDRESS]} (mouse button)`;
 }
 
 function updateVideoMemoryView(memory) {
