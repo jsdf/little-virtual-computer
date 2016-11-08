@@ -1,4 +1,17 @@
-// --- MEMORY ---
+/*
+
+Components: (do a ctrl-f find for them)
+1.MEMORY
+2.CPU
+3.DISPLAY
+4.INPUT
+5.ASSEMBLER
+6.SIMULATION CONTROL
+7.BUILT-IN PROGRAMS
+
+*/
+
+// 1.MEMORY
 
 /*
 We are going to use an array to simulate computer memory. We can store a number
@@ -97,7 +110,7 @@ function memorySetDereferenced(address, value) {
   memorySet(directAddress, value);
 }
 
-// --- CPU ---
+// 2.CPU
 
 /*
 As we move through our program, we need to keep track of where we are up to.
@@ -397,7 +410,7 @@ function step() {
 }
 
 
-// --- DISPLAY ---
+// 3.DISPLAY
 
 const SCREEN_WIDTH = 30;
 const SCREEN_HEIGHT = 30;
@@ -465,7 +478,7 @@ function drawScreen() {
   // putScreenPixelsToCanvas(pixelsRGBA);
 }
 
-// --- INPUT ---
+// 4.INPUT
 
 let mouseDown = 0;
 document.body.onmousedown = function() { 
@@ -491,7 +504,7 @@ function updateInputs() {
   MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + mouseY * SCREEN_WIDTH + mouseX;
 }
 
-// --- ASSEMBLER ---
+// 5.ASSEMBLER
 
 /*
 We use a simple text-based language to input our program. This is our 'assembly
@@ -642,7 +655,7 @@ function assembleAndLoadProgram(programInstructions) {
   }
 }
 
-// --- SIMULATION CONTROL ---
+// 6.SIMULATION CONTROL
 
 function runStop() {
   if (running) {
@@ -706,7 +719,7 @@ function init() {
   updateUI();
 }
 
-// --- BUILT-IN PROGRAMS ---
+// 7.BUILT-IN PROGRAMS
 
 const PROGRAMS = {
   'Add':
