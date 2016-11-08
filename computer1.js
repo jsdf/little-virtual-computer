@@ -32,8 +32,9 @@ The final 1000 slots will be used to communicate with the input and output (I/O)
 devices.
 2000: the keycode of the key which is currently pressed
 2001, 2002: the x and y position of the mouse within the screen.
-2003: mouse button status (0 = up, 1 = down)
-2004: a random number which changes before every instruction
+2003: the address of the pixel the mouse is currently on
+2004: mouse button status (0 = up, 1 = down)
+2010: a random number which changes before every instruction
 2005 - 2099: unused
 2100 - 2999: The color values of the pixels of the 30x30 pixel screen, row by
   row, from the top left. For example, the top row uses slots 2100 - 2129, and
@@ -47,8 +48,9 @@ const PROGRAM_MEMORY_END = 2000;
 const KEYCODE_ADDRESS = 2000;
 const MOUSE_X_ADDRESS = 2001;
 const MOUSE_Y_ADDRESS = 2002;
-const MOUSE_BUTTON_ADDRESS = 2003;
-const RANDOM_NUMBER_ADDRESS = 2004
+const MOUSE_PIXEL_ADDRESS = 2003;
+const MOUSE_BUTTON_ADDRESS = 2004;
+const RANDOM_NUMBER_ADDRESS = 2010
 const VIDEO_MEMORY_START = 2100;
 const VIDEO_MEMORY_END = 3000;
 
@@ -379,6 +381,7 @@ devices (keyboard, mouse), executing the instruction, then writing output to the
 output devices (screen, audio).
 */
 function step() {
+  updateInputs();
   const opcode = advanceProgramCounter();
   const instructionName = opcodesToInstructions.get(opcode);
   if (!instructionName) {
@@ -445,7 +448,9 @@ We don't need to vary the alpha (opacity) values, so we'll just set them to 255
 */
 const VIDEO_MEMORY_LENGTH = VIDEO_MEMORY_END - VIDEO_MEMORY_START;
 function drawScreen() {
-  const pixelsRGBA = new Uint8ClampedArray(SCREEN_WIDTH * SCREEN_HEIGHT * 4);
+  // const pixelsRGBA = new Uint8ClampedArray(SCREEN_WIDTH * SCREEN_HEIGHT * 4);
+  const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
+  const pixelsRGBA = imageData.data;
   for (var i = 0; i < VIDEO_MEMORY_LENGTH; i++) {
     const pixelColorId = MEMORY[VIDEO_MEMORY_START + i];
     const colorRGB = COLOR_PALETTE[pixelColorId || 0];
@@ -454,8 +459,36 @@ function drawScreen() {
     pixelsRGBA[i * 4 + 2] = colorRGB[2];
     pixelsRGBA[i * 4 + 3] = 255; // full opacity
   }
+
+  canvasCtx.putImageData(imageData, 0, 0);
   // actually write pixels to the canvas (scaled up)
-  putScreenPixelsToCanvas(pixelsRGBA);
+  // putScreenPixelsToCanvas(pixelsRGBA);
+}
+
+// --- INPUT ---
+
+let mouseDown = 0;
+document.body.onmousedown = function() { 
+  ++mouseDown;
+}
+document.body.onmouseup = function() {
+  --mouseDown;
+}
+
+let mouseX = 0;
+let mouseY = 0;
+
+function handleMouseMove(event) {
+  mouseX = event.offsetX;
+  mouseY = event.offsetY;
+}
+
+function updateInputs() {
+  MEMORY[RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
+  MEMORY[MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
+  MEMORY[MOUSE_X_ADDRESS] = mouseX;
+  MEMORY[MOUSE_Y_ADDRESS] = mouseY;
+  MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + mouseY * SCREEN_WIDTH + mouseX;
 }
 
 // --- ASSEMBLER ---
@@ -492,15 +525,12 @@ function parseProgramText(programText) {
   const lines = programText.split('\n');
   for (const line of lines) {
     const instruction = {name: null, operands: []};
-    let tokens = line.split(' ');
+    let tokens = line.replace(/;.*$/, '') // strip comments
+      .split(' ');
     for (const token of tokens) {
       // skip empty tokens
       if (token == null || token == "") {
         continue;
-      }
-      // skip rest of the line for comments
-      if (token[0] === ';') {
-        break;
       }
       // first token
       if (!instruction.name) {
@@ -530,7 +560,7 @@ function parseProgramText(programText) {
         number = number - (indirectAddress ? 10000 : 0);
 
         if (Number.isNaN(number)) {
-          throw new Error(`couldn't parse operand ${token}`);
+          throw new Error(`couldn't parse operand ${token} at line '${line}`);
         }
 
         instruction.operands.push(number);
@@ -585,28 +615,44 @@ function assembleAndLoadProgram(programInstructions) {
     if (instruction.name === 'label') {
       continue;
     }
+    // for each instruction, we first write the relevant opcode to memory
     const opcode = instructionsToOpcodes.get(instruction.name);
     if (!opcode) {
       throw new Error(`No opcode found for instruction '${instruction.name}'`);
     }
     MEMORY[loadingAddress++] = opcode;
-    for (var i = 0; i < instruction.operands.length; i++) {
-      if (instructionsLabelOperands.has(instruction.name)) {
-        if (instructionsLabelOperands.get(instruction.name) === i) {
-          const labelAddress = labelAddresses[instruction.operands[i]];
-          if (!labelAddress) {
-            throw new Error(`couldn't find label ${instruction.operands[i]}`);
-          }
-          MEMORY[loadingAddress++] = labelAddress;
-        }
-      } else {
-        MEMORY[loadingAddress++] = instruction.operands[i];
+    
+    // then, we write the operands for instruction to memory
+    const operands = instruction.operands.slice(0);
+
+    // replace labels used as operands with actual memory address
+    if (instructionsLabelOperands.has(instruction.name)) {
+      const labelOperandIndex = instructionsLabelOperands.get(instruction.name);
+      const labelName = instruction.operands[labelOperandIndex];
+      const labelAddress = labelAddresses[labelName];
+      if (!labelAddress) {
+        throw new Error(`unknown label '${labelName}'`);
       }
+      operands[labelOperandIndex] = labelAddress;
+    }
+
+    for (var i = 0; i < operands.length; i++) {
+      MEMORY[loadingAddress++] = operands[i];
     }
   }
 }
 
 // --- SIMULATION CONTROL ---
+
+function runStop() {
+  if (running) {
+    running = false;
+  } else {
+    running = true;
+    loop();
+  }
+  updateUI();
+}
 
 function stepOnce() {
   running = true;
@@ -615,14 +661,20 @@ function stepOnce() {
   updateUI();
 }
 
-let cyclePeriod = 0;
-function runToEnd() {
-  running = true;
-
-  step();
-  updateUI();
+let delayBetweenCycles = 0;
+const CYCLES_PER_YIELD = 997;
+function loop() {
+  if (delayBetweenCycles === 0) {
+    for (var i = 0; i < CYCLES_PER_YIELD; i++) {
+      if (!running) break;
+      step();
+    }
+  } else {
+    step();
+    updateUI();
+  }
   if (running) {
-    setTimeout(runToEnd, cyclePeriod);
+    setTimeout(loop, delayBetweenCycles);
   }
 }
 
@@ -639,10 +691,16 @@ function init() {
     MEMORY[i] = 0;
   }
 
-  assembleAndLoadProgram(parseProgramText(getProgramText()));
+  try {
+    assembleAndLoadProgram(parseProgramText(getProgramText()));
+  } catch (err) {
+    alert(err.stack);
+    console.error(err.stack)
+  }
 
   programCounter = PROGRAM_START;
   halted = false;
+  running = false;
   drawScreen();
   updateProgramMemoryView(MEMORY);
   updateUI();
@@ -656,15 +714,25 @@ const PROGRAMS = {
 set_value 1 4
 add 0 1 2`,
   'RandomPixels':
-`set_value 0 2100 ; use addr 0 to store pointer to current screen pixel
+`FillScreen:
+set_value 0 2100 ; use addr 0 to store pointer to current screen pixel
+jump_to FillScreenLoop
 
 FillScreenLoop:
 ; modulo random value by number of colors in palette to get a color value,
 ; and write it to current screen pixel, eg. the address pointed to by address 0
-modulo_addr_val 2004 16 *0
+modulo_addr_val 2010 16 *0
 add_addr_val 0 1 0 ; increment pointer to point to next screen pixel address
-branch_if_not_equal_addr_val 0 3000 FillScreenLoop
-halt
+branch_if_not_equal_addr_val 0 3000 FillScreenLoop ;if not finished, repeat
+jump_to FillScreen ;start again from the top
+`,
+  'Paint': `MainLoop:
+branch_if_equal_addr_val 2004 1 PaintAtCursor; if mouse button down, paint
+jump_to MainLoop
+
+PaintAtCursor:
+set_value *2003 3 ; set pixel at mouse cursor to color
+jump_to MainLoop
 `,
   'Custom 1': '',
   'Custom 2': '',
@@ -694,7 +762,7 @@ const programSelectorEl = ge('programSelector');
 const canvasEl = ge('canvas');
 const canvasCtx = canvasEl.getContext('2d');
 
-let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixel'; // default
+let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels'; // default
 
 // init program selector
 Object.keys(PROGRAMS).forEach(programName => {
@@ -714,7 +782,7 @@ function selectProgram() {
   selectedProgram = programSelectorEl.value;
   localStorage.setItem('selectedProgram', selectedProgram);
   programEl.value =
-    localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram];
+    localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram] || '';
 }
 
 function editProgramText() {
@@ -724,7 +792,7 @@ function editProgramText() {
 }
 
 function setSpeed() {
-  cyclePeriod = -parseInt(speedEl.value, 10);
+  delayBetweenCycles = -parseInt(speedEl.value, 10);
 }
 
 function updateUI() {
@@ -755,17 +823,26 @@ function updateProgramMemoryView(memory) {
   const lines = [];
   for (var i = PROGRAM_MEMORY_START; i < PROGRAM_MEMORY_END; i++) {
     const instruction = opcodesToInstructions.get(memory[i]);
-    lines.push(`${i}: ${memory[i]} ${instruction || ''}`);
+    lines.push(`${padRight(i, 4)}: ${padRight(memory[i], 8)} ${instruction || ''}`);
+    if (instruction) {
+      const operands = instructions[instruction].operands;
+      for (var j = 0; j < operands.length; j++) {
+        lines.push(`${padRight(i + j, 4)}: ${padRight(memory[i + j], 8)} '${operands[j]}'`);
+      }
+      i += operands.length;
+    }
   }
   programMemoryViewEl.textContent = lines.join('\n');
 }
 
 function updateInputMemoryView(memory) {
   inputMemoryViewEl.textContent =
-    `${KEYCODE_ADDRESS}: ${memory[KEYCODE_ADDRESS]} (keycode)
-${MOUSE_X_ADDRESS}: ${memory[MOUSE_X_ADDRESS]} (mouse x)
-${MOUSE_Y_ADDRESS}: ${memory[MOUSE_Y_ADDRESS]} (mouse y)
-${MOUSE_BUTTON_ADDRESS}: ${memory[MOUSE_BUTTON_ADDRESS]} (mouse button)`;
+    `${KEYCODE_ADDRESS}: ${padRight(memory[KEYCODE_ADDRESS], 8)} keycode
+${MOUSE_X_ADDRESS}: ${padRight(memory[MOUSE_X_ADDRESS], 8)} mouse x
+${MOUSE_Y_ADDRESS}: ${padRight(memory[MOUSE_Y_ADDRESS], 8)} mouse y
+${MOUSE_PIXEL_ADDRESS}: ${padRight(memory[MOUSE_PIXEL_ADDRESS], 8)} mouse button
+${MOUSE_BUTTON_ADDRESS}: ${padRight(memory[MOUSE_BUTTON_ADDRESS], 8)} mouse pixel
+${RANDOM_NUMBER_ADDRESS}: ${padRight(memory[RANDOM_NUMBER_ADDRESS], 8)} random number`;
 }
 
 function updateVideoMemoryView(memory) {
@@ -800,6 +877,15 @@ function putScreenPixelsToCanvas(pixelsRGBA) {
 
 function clamp(val, min, max) {
   return Math.min(min, Math.max(max, val));
+}
+
+function padRight(input, length) {
+  const str = input + '';
+  let padded = str;
+  for (var i = str.length; i < length; i++) {
+    padded += " ";
+  }
+  return padded;
 }
 
 init();

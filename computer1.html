@@ -18,7 +18,7 @@
     }
   </style>
   <button onclick="init()">load program/reset</button>
-  <button id="runButton" onclick="runToEnd()">run</button>
+  <button id="runButton" onclick="runStop()">run/stop</button>
   <button id="stepButton" onclick="stepOnce()">step</button>
   <span id="running"></span>
   <label>program counter <input id="programCounter"></input></label>
@@ -31,8 +31,8 @@
       program memory (slots 1000 - 1999):
       <textarea id="programMemoryView" readonly rows="10" cols="40">
       </textarea>
-      input memory (slots 2000 - 2002):
-      <textarea id="inputMemoryView" readonly rows="3" cols="40">
+      input memory (slots 2000 - 2004):
+      <textarea id="inputMemoryView" readonly rows="6" cols="40">
       </textarea>
       video memory (slots 2100 - 2999):
       <textarea id="videoMemoryView" readonly rows="10" cols="40">
@@ -47,7 +47,7 @@
       </div>
     </div>
     <div style="flex: 1">
-      <canvas id="canvas" width="600" height="600"></canvas>
+      <canvas id="canvas" width="30" height="30" style="transform-origin: top left; transform: scale(20);image-rendering: pixelated;" onmousemove="handleMouseMove(event)"></canvas>
     </div>
   </div>
   <script type="text/javascript" src="./computer1.js"></script>
