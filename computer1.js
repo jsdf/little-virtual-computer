@@ -43,12 +43,13 @@ The next 1000 (1000 - 1999) we'll load our program code into, and that's where
 it will be executed from.
 The final 1000 slots will be used to communicate with the input and output (I/O)
 devices.
-2000: the keycode of the key which is currently pressed
-2001, 2002: the x and y position of the mouse within the screen.
-2003: the address of the pixel the mouse is currently on
-2004: mouse button status (0 = up, 1 = down)
-2010: a random number which changes before every instruction
-2005 - 2099: unused
+2000 - 2003: the keycode of a key which is currently pressed, from most recently
+  to least recently started
+2010, 2011: the x and y position of the mouse within the screen.
+2012: the address of the pixel the mouse is currently on
+2013: mouse button status (0 = up, 1 = down)
+2050: a random number which changes before every instruction
+2051 - 2099: unused
 2100 - 2999: The color values of the pixels of the 30x30 pixel screen, row by
   row, from the top left. For example, the top row uses slots 2100 - 2129, and
   the bottom row uses slots 2970 - 3000.
@@ -58,12 +59,15 @@ const WORKING_MEMORY_START = 0;
 const WORKING_MEMORY_END = 1000;
 const PROGRAM_MEMORY_START = 1000;
 const PROGRAM_MEMORY_END = 2000;
-const KEYCODE_ADDRESS = 2000;
-const MOUSE_X_ADDRESS = 2001;
-const MOUSE_Y_ADDRESS = 2002;
-const MOUSE_PIXEL_ADDRESS = 2003;
-const MOUSE_BUTTON_ADDRESS = 2004;
-const RANDOM_NUMBER_ADDRESS = 2010
+const KEYCODE_0_ADDRESS = 2000;
+const KEYCODE_1_ADDRESS = 2001;
+const KEYCODE_2_ADDRESS = 2002;
+const KEYCODE_3_ADDRESS = 2003;
+const MOUSE_X_ADDRESS = 2010;
+const MOUSE_Y_ADDRESS = 2011;
+const MOUSE_PIXEL_ADDRESS = 2012;
+const MOUSE_BUTTON_ADDRESS = 2013;
+const RANDOM_NUMBER_ADDRESS = 2050
 const VIDEO_MEMORY_START = 2100;
 const VIDEO_MEMORY_END = 3000;
 
@@ -480,6 +484,24 @@ function drawScreen() {
 
 // 4.INPUT
 
+let keysPressed = [0, 0, 0, 0, 0, 0];
+document.body.onkeydown = function(event) {
+  if (keysPressed.some(k => k === event.which)) {
+    return;
+  }
+  for (var i = 0; i < keysPressed.length - 1; i++) {
+    keysPressed[i + 1] = keysPressed[i];
+  }
+  keysPressed[0] = event.which;
+}
+document.body.onkeyup = function(event) {
+  const nextKeysPressed = keysPressed.filter(k => k !== event.which);
+  for (var i = nextKeysPressed.length - 1; i < keysPressed.length; i++) {
+    nextKeysPressed[i] = 0;
+  }
+  keysPressed = nextKeysPressed;
+}
+
 let mouseDown = 0;
 document.body.onmousedown = function() { 
   ++mouseDown;
@@ -497,11 +519,15 @@ function handleMouseMove(event) {
 }
 
 function updateInputs() {
-  MEMORY[RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
+  MEMORY[KEYCODE_0_ADDRESS] = keysPressed[0];
+  MEMORY[KEYCODE_1_ADDRESS] = keysPressed[1];
+  MEMORY[KEYCODE_2_ADDRESS] = keysPressed[2];
+  MEMORY[KEYCODE_3_ADDRESS] = keysPressed[3];
   MEMORY[MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
   MEMORY[MOUSE_X_ADDRESS] = mouseX;
   MEMORY[MOUSE_Y_ADDRESS] = mouseY;
   MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + mouseY * SCREEN_WIDTH + mouseX;
+  MEMORY[RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
 }
 
 // 5.ASSEMBLER
@@ -734,17 +760,17 @@ jump_to FillScreenLoop
 FillScreenLoop:
 ; modulo random value by number of colors in palette to get a color value,
 ; and write it to current screen pixel, eg. the address pointed to by address 0
-modulo_addr_val 2010 16 *0
+modulo_addr_val 2050 16 *0
 add_addr_val 0 1 0 ; increment pointer to point to next screen pixel address
 branch_if_not_equal_addr_val 0 3000 FillScreenLoop ;if not finished, repeat
 jump_to FillScreen ;start again from the top
 `,
   'Paint': `MainLoop:
-branch_if_equal_addr_val 2004 1 PaintAtCursor; if mouse button down, paint
+branch_if_equal_addr_val 2013 1 PaintAtCursor; if mouse button down, paint
 jump_to MainLoop
 
 PaintAtCursor:
-set_value *2003 3 ; set pixel at mouse cursor to color
+set_value *2012 3 ; set pixel at mouse cursor to color
 jump_to MainLoop
 `,
   'Custom 1': '',
@@ -850,7 +876,10 @@ function updateProgramMemoryView(memory) {
 
 function updateInputMemoryView(memory) {
   inputMemoryViewEl.textContent =
-    `${KEYCODE_ADDRESS}: ${padRight(memory[KEYCODE_ADDRESS], 8)} keycode
+    `${KEYCODE_0_ADDRESS}: ${padRight(memory[KEYCODE_0_ADDRESS], 8)} keycode 0
+${KEYCODE_1_ADDRESS}: ${padRight(memory[KEYCODE_1_ADDRESS], 8)} keycode 1
+${KEYCODE_2_ADDRESS}: ${padRight(memory[KEYCODE_2_ADDRESS], 8)} keycode 2
+${KEYCODE_3_ADDRESS}: ${padRight(memory[KEYCODE_3_ADDRESS], 8)} keycode 3
 ${MOUSE_X_ADDRESS}: ${padRight(memory[MOUSE_X_ADDRESS], 8)} mouse x
 ${MOUSE_Y_ADDRESS}: ${padRight(memory[MOUSE_Y_ADDRESS], 8)} mouse y
 ${MOUSE_PIXEL_ADDRESS}: ${padRight(memory[MOUSE_PIXEL_ADDRESS], 8)} mouse button
