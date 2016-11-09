@@ -151,7 +151,7 @@ const instructions = {
   copy: {
     opcode: 9000,
     description: 'set memory at address to the value at the given address',
-    operands: ['destination (address)', 'source (address)'],
+    operands: [['destination', 'address'], ['source', 'address']],
     execute(destination, sourceAddress) {
       const sourceValue = memoryGet(sourceAddress);
       memorySet(destination, sourceValue);
@@ -160,7 +160,7 @@ const instructions = {
   set_val: {
     opcode: 9001,
     description: 'set memory at address to given value',
-    operands: ['destination (address)', 'source (value)'],
+    operands: [['destination', 'address'], ['source', 'value']],
     execute(address, sourceValue) {
       memorySet(address, sourceValue);
     },
@@ -169,7 +169,7 @@ const instructions = {
     opcode: 9002,
     description: `set memory at destination address to the value at the
 address pointed to by the value at 'source' address`,
-    operands: ['destination (address)', 'source (pointer)'],
+    operands: [['destination', 'address'], ['source', 'pointer']],
     execute(destinationAddress, sourcePointer) {
       const sourceAddress = memoryGet(sourcePointer);
       const sourceValue = memoryGet(sourceAddress);
@@ -180,7 +180,7 @@ address pointed to by the value at 'source' address`,
     opcode: 9003,
     description: `set memory at the address pointed to by the value at
 'destination' address to the value at the source address`,
-    operands: ['destination (pointer)', 'source (address)'],
+    operands: [['destination', 'pointer'], ['source', 'address']],
     execute(destinationPointer, sourceAddress) {
       const destinationAddress = memoryGet(destinationPointer);
       const sourceValue = memoryGet(sourceAddress);
@@ -191,7 +191,7 @@ address pointed to by the value at 'source' address`,
     opcode: 9010,
     description: `add the value at the 'a' address with the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (address)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
     execute(aAddress, bAddress, resultAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -203,7 +203,7 @@ address and store the result at the 'result' address`,
     opcode: 9011,
     description: `add the value at the 'a' address with the value 'b' and store
 the result at the 'result' address`,
-    operands: ['a (address)', 'b (value)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a + b;
@@ -214,7 +214,7 @@ the result at the 'result' address`,
     opcode: 9020,
     description: `from the value at the 'a' address, subtract the value at the
 'b' address and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (address)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
     execute(aAddress, bAddress, resultAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -226,7 +226,7 @@ the result at the 'result' address`,
     opcode: 9021,
     description: `from the value at the 'a' address, subtract the value 'b' and
 store the result at the 'result' address`,
-    operands: ['a (address)', 'b (value)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a - b;
@@ -237,7 +237,7 @@ store the result at the 'result' address`,
     opcode: 9030,
     description: `multiply the value at the 'a' address and the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (address)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
     execute(aAddress, bAddress, resultAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -249,7 +249,7 @@ address and store the result at the 'result' address`,
     opcode: 9031,
     description: `multiply the value at the 'a' address and the value 'b' and
 store the result at the 'result' address`,
-    operands: ['a (address)', 'b (value)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a * b;
@@ -260,7 +260,7 @@ store the result at the 'result' address`,
     opcode: 9040,
     description: `integer divide the value at the 'a' address by the value at
 the 'b' address and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (address)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
     execute(aAddress, bAddress, resultAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -273,7 +273,7 @@ the 'b' address and store the result at the 'result' address`,
     opcode: 9041,
     description: `integer divide the value at the 'a' address by the value 'b'
 and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (value)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       if (b === 0) throw new Error('tried to divide by zero');
@@ -285,7 +285,7 @@ and store the result at the 'result' address`,
     opcode: 9050,
     description: `get the value at the 'a' address modulo the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: ['a (address)', 'b (address)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
     execute(aAddress, bAddress, resultAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -298,7 +298,7 @@ address and store the result at the 'result' address`,
     opcode: 9051,
     description: `get the value at the 'a' address modulo the value 'b' and
 store the result at the 'result' address`,
-    operands: ['a (address)', 'b (value)', 'result (address)'],
+    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a % b;
@@ -310,7 +310,7 @@ store the result at the 'result' address`,
     opcode: 9100,
     description: `set the program counter to the address of the label specified,
 so the program continues from there`,
-    operands: ['destination (label)'],
+    operands: [['destination', 'label']],
     execute(labelAddress) {
       programCounter = labelAddress;
     },
@@ -320,7 +320,7 @@ so the program continues from there`,
     description: `if the value at address 'a' is equal to the value at address
 'b', set the program counter to the address of the label specified, so the
 program continues from there`,
-    operands: ['a (address)', 'b (address)', 'destination (label)'],
+    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
     execute(aAddress, bAddress, labelAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -334,7 +334,7 @@ program continues from there`,
     description: `if the value at address 'a' is equal to the value 'b', set the
 program counter to the address of the label specified, so the program continues
 from there`,
-    operands: ['a (address)', 'b (value)', 'destination (label)'],
+    operands: [['a', 'address'], ['b', 'value'], ['destination', 'label']],
     execute(aAddress, b, labelAddress) {
       const a = memoryGet(aAddress);
       if (a === b)  {
@@ -347,7 +347,7 @@ from there`,
     description: `if the value at address 'a' is not equal to the value at
 address 'b', set the program counter to the address of the label specified, so
 the program continues from there`,
-    operands: ['a (address)', 'b (address)', 'destination (label)'],
+    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
     execute(aAddress, bAddress, labelAddress) {
       const a = memoryGet(aAddress);
       const b = memoryGet(bAddress);
@@ -361,7 +361,7 @@ the program continues from there`,
     description: `if the value at address 'a' is not equal to the value 'b', set
 the program counter to the address of the label specified, so the program
 continues from there`,
-    operands: ['a (address)', 'b (value)', 'destination (label)'],
+    operands: [['a', 'address'], ['b', 'value'], ['destination', 'label']],
     execute(aAddress, b, labelAddress) {
       const a = memoryGet(aAddress);
       if (a !== b)  {
@@ -550,7 +550,7 @@ and operands for that instruction, from each line.
 const instructionsLabelOperands = new Map();
 Object.keys(instructions).forEach(name => {
   const labelOperandIndex = instructions[name].operands.findIndex(operand =>
-    operand.includes('(label)')
+    operand[1] === 'label'
   );
   if (labelOperandIndex > -1) {
     instructionsLabelOperands.set(name, labelOperandIndex);
@@ -879,7 +879,7 @@ function updateProgramMemoryView(memory) {
     if (instruction) {
       const operands = instructions[instruction].operands;
       for (var j = 0; j < operands.length; j++) {
-        lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)} '${operands[j]}'`);
+        lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
       }
       i += operands.length;
     }
