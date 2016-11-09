@@ -25,9 +25,9 @@
       font-weight: bold;
     }
   </style>
-  <button onclick="init()">load program/reset</button>
   <button id="runButton" onclick="runStop()">run/stop</button>
   <button id="stepButton" onclick="stepOnce()">step</button>
+  <button onclick="init()">reset</button>
   <span id="running"></span>
   <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="setSpeed()"></input>
   <label>full speed <input id="fullspeed" type="checkbox" checked onchange="setFullspeed()"></input></label>
@@ -51,6 +51,7 @@
         <label>
           program:
           <select id="programSelector" onchange="selectProgram()"></select>
+          <button id="loadProgramButton" onclick="init()">load program</button>
         </label>
         <textarea id="program" rows="10" cols="40" onchange="editProgramText()">
         </textarea>

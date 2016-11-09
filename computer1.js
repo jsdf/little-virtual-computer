@@ -148,6 +148,10 @@ about each of the instructions so our simulator user interface can show it
 alongside the 'disassembled' view of the program code in memory.
 */
 const instructions = {
+  // this instruction is typically called 'mov', short for 'move', as in 'move
+  // value at *this* address to *that* address', but this naming can be a bit
+  // confusing, because the operation doesn't remove the value at the source
+  // address, as 'move' might seem to imply, so for clarity we'll call it 'copy' instead.
   copy: {
     opcode: 9000,
     description: 'set memory at address to the value at the given address',
@@ -157,10 +161,10 @@ const instructions = {
       memorySet(destination, sourceValue);
     },
   },
-  set_val: {
+  copy_constant: {
     opcode: 9001,
-    description: 'set memory at address to given value',
-    operands: [['destination', 'address'], ['source', 'value']],
+    description: 'set memory at address to the given constant value',
+    operands: [['destination', 'address'], ['source', 'constant']],
     execute(address, sourceValue) {
       memorySet(address, sourceValue);
     },
@@ -187,7 +191,7 @@ address pointed to by the value at 'source' address`,
       memorySet(destinationAddress, sourceValue);
     },
   },
-  add_addr_addr: {
+  add: {
     opcode: 9010,
     description: `add the value at the 'a' address with the value at the 'b'
 address and store the result at the 'result' address`,
@@ -199,18 +203,18 @@ address and store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  add_addr_val: {
+  add_constant: {
     opcode: 9011,
-    description: `add the value at the 'a' address with the value 'b' and store
+    description: `add the value at the 'a' address with the constant value 'b' and store
 the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a + b;
       memorySet(resultAddress, result);
     },
   },
-  subtract_addr_addr: {
+  subtract: {
     opcode: 9020,
     description: `from the value at the 'a' address, subtract the value at the
 'b' address and store the result at the 'result' address`,
@@ -222,18 +226,18 @@ the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  subtract_addr_val: {
+  subtract_constant: {
     opcode: 9021,
-    description: `from the value at the 'a' address, subtract the value 'b' and
+    description: `from the value at the 'a' address, subtract the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a - b;
       memorySet(resultAddress, result);
     },
   },
-  multiply_addr_addr: {
+  multiply: {
     opcode: 9030,
     description: `multiply the value at the 'a' address and the value at the 'b'
 address and store the result at the 'result' address`,
@@ -245,18 +249,18 @@ address and store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  multiply_addr_val: {
+  multiply_constant: {
     opcode: 9031,
-    description: `multiply the value at the 'a' address and the value 'b' and
+    description: `multiply the value at the 'a' address and the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a * b;
       memorySet(resultAddress, result);
     },
   },
-  divide_addr_addr: {
+  divide: {
     opcode: 9040,
     description: `integer divide the value at the 'a' address by the value at
 the 'b' address and store the result at the 'result' address`,
@@ -269,11 +273,11 @@ the 'b' address and store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  divide_addr_val: {
+  divide_constant: {
     opcode: 9041,
-    description: `integer divide the value at the 'a' address by the value 'b'
+    description: `integer divide the value at the 'a' address by the constant value 'b'
 and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       if (b === 0) throw new Error('tried to divide by zero');
@@ -281,7 +285,7 @@ and store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  modulo_addr_addr: {
+  modulo: {
     opcode: 9050,
     description: `get the value at the 'a' address modulo the value at the 'b'
 address and store the result at the 'result' address`,
@@ -294,11 +298,11 @@ address and store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
-  modulo_addr_val: {
+  modulo_constant: {
     opcode: 9051,
-    description: `get the value at the 'a' address modulo the value 'b' and
+    description: `get the value at the 'a' address modulo the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'value'], ['result', 'address']],
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
     execute(aAddress, b, resultAddress) {
       const a = memoryGet(aAddress);
       const result = a % b;
@@ -315,7 +319,7 @@ so the program continues from there`,
       programCounter = labelAddress;
     },
   },
-  'branch_if_equal_addr_addr':  {
+  'branch_if_equal':  {
     opcode: 9101,
     description: `if the value at address 'a' is equal to the value at address
 'b', set the program counter to the address of the label specified, so the
@@ -329,12 +333,12 @@ program continues from there`,
       }
     },
   },
-  'branch_if_equal_addr_val':  {
+  'branch_if_equal_constant':  {
     opcode: 9102,
-    description: `if the value at address 'a' is equal to the value 'b', set the
+    description: `if the value at address 'a' is equal to the constant value 'b', set the
 program counter to the address of the label specified, so the program continues
 from there`,
-    operands: [['a', 'address'], ['b', 'value'], ['destination', 'label']],
+    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
     execute(aAddress, b, labelAddress) {
       const a = memoryGet(aAddress);
       if (a === b)  {
@@ -342,7 +346,7 @@ from there`,
       }
     },
   },
-  'branch_if_not_equal_addr_addr':  {
+  'branch_if_not_equal':  {
     opcode: 9103,
     description: `if the value at address 'a' is not equal to the value at
 address 'b', set the program counter to the address of the label specified, so
@@ -356,12 +360,12 @@ the program continues from there`,
       }
     },
   },
-  'branch_if_not_equal_addr_val':  {
+  'branch_if_not_equal_constant':  {
     opcode: 9104,
-    description: `if the value at address 'a' is not equal to the value 'b', set
+    description: `if the value at address 'a' is not equal to the constant value 'b', set
 the program counter to the address of the label specified, so the program
 continues from there`,
-    operands: [['a', 'address'], ['b', 'value'], ['destination', 'label']],
+    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
     execute(aAddress, b, labelAddress) {
       const a = memoryGet(aAddress);
       if (a !== b)  {
@@ -744,25 +748,25 @@ function init() {
 
 const PROGRAMS = {
   'Add':
-`set_val 0 4
-set_val 1 4
-add_addr_addr 0 1 2`,
+`copy_constant 0 4
+copy_constant 1 4
+add 0 1 2`,
   'RandomPixels':
 `FillScreen:
-set_val 0 2100 ; use addr 0 to store pointer to current screen pixel
+copy_constant 0 2100 ; use addr 0 to store pointer to current screen pixel
 jump_to FillScreenLoop
 
 FillScreenLoop:
 ; modulo random value by number of colors in palette to get a color value,
 ; and write it to current screen pixel, eg. the address pointed to by address 0
-modulo_addr_val 2050 16 1
+modulo_constant 2050 16 1
 copy_into_ptr 0 1
-add_addr_val 0 1 0 ; increment pointer to point to next screen pixel address
-branch_if_not_equal_addr_val 0 3000 FillScreenLoop ;if not finished, repeat
+add_constant 0 1 0 ; increment pointer to point to next screen pixel address
+branch_if_not_equal_constant 0 3000 FillScreenLoop ;if not finished, repeat
 jump_to FillScreen ;start again from the top
 `,
   'Paint': `MainLoop:
-branch_if_equal_addr_val 2013 1 PaintAtCursor; if mouse button down, paint
+branch_if_equal_constant 2013 1 PaintAtCursor; if mouse button down, paint
 jump_to MainLoop
 
 PaintAtCursor:
