@@ -62,7 +62,6 @@ const PROGRAM_MEMORY_END = 2000;
 const KEYCODE_0_ADDRESS = 2000;
 const KEYCODE_1_ADDRESS = 2001;
 const KEYCODE_2_ADDRESS = 2002;
-const KEYCODE_3_ADDRESS = 2003;
 const MOUSE_X_ADDRESS = 2010;
 const MOUSE_Y_ADDRESS = 2011;
 const MOUSE_PIXEL_ADDRESS = 2012;
@@ -409,8 +408,6 @@ function step() {
   // execute the instruction with those operands
   const operands = instructions[instructionName].operands.map(advanceProgramCounter);
   instructions[instructionName].execute.apply(null, operands);
-
-  drawScreen();
 }
 
 
@@ -454,6 +451,9 @@ const COLOR_PALETTE = {
   15: [  0,  0,128], // Navy 
 };
 
+const canvasEl = document.getElementById('canvas');
+const canvasCtx = canvasEl.getContext('2d');
+const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 /*
 Read the pixel values from video memory, look them up in our color palette, and
 convert them to the format which the Canvas 2D API requires: an array of RGBA
@@ -463,10 +463,9 @@ each pixel, one for each of the RGBA channels (red, green, blue, alpha).
 We don't need to vary the alpha (opacity) values, so we'll just set them to 255
 (full opacity) for every pixel.
 */
+
 const VIDEO_MEMORY_LENGTH = VIDEO_MEMORY_END - VIDEO_MEMORY_START;
 function drawScreen() {
-  // const pixelsRGBA = new Uint8ClampedArray(SCREEN_WIDTH * SCREEN_HEIGHT * 4);
-  const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
   const pixelsRGBA = imageData.data;
   for (var i = 0; i < VIDEO_MEMORY_LENGTH; i++) {
     const pixelColorId = MEMORY[VIDEO_MEMORY_START + i];
@@ -478,28 +477,16 @@ function drawScreen() {
   }
 
   canvasCtx.putImageData(imageData, 0, 0);
-  // actually write pixels to the canvas (scaled up)
-  // putScreenPixelsToCanvas(pixelsRGBA);
 }
 
 // 4.INPUT
 
-let keysPressed = [0, 0, 0, 0, 0, 0];
+const keysPressed = new Set();
 document.body.onkeydown = function(event) {
-  if (keysPressed.some(k => k === event.which)) {
-    return;
-  }
-  for (var i = 0; i < keysPressed.length - 1; i++) {
-    keysPressed[i + 1] = keysPressed[i];
-  }
-  keysPressed[0] = event.which;
+  keysPressed.add(event.which);
 }
 document.body.onkeyup = function(event) {
-  const nextKeysPressed = keysPressed.filter(k => k !== event.which);
-  for (var i = nextKeysPressed.length - 1; i < keysPressed.length; i++) {
-    nextKeysPressed[i] = 0;
-  }
-  keysPressed = nextKeysPressed;
+  keysPressed.delete(event.which);
 }
 
 let mouseDown = 0;
@@ -513,16 +500,17 @@ document.body.onmouseup = function() {
 let mouseX = 0;
 let mouseY = 0;
 
-function handleMouseMove(event) {
+document.getElementById('canvas').onmousemove = function(event) {
   mouseX = event.offsetX;
   mouseY = event.offsetY;
 }
 
 function updateInputs() {
-  MEMORY[KEYCODE_0_ADDRESS] = keysPressed[0];
-  MEMORY[KEYCODE_1_ADDRESS] = keysPressed[1];
-  MEMORY[KEYCODE_2_ADDRESS] = keysPressed[2];
-  MEMORY[KEYCODE_3_ADDRESS] = keysPressed[3];
+  const mostRecentKeys = Array.from(keysPressed.values()).reverse();
+
+  MEMORY[KEYCODE_0_ADDRESS] = mostRecentKeys[0] || 0;
+  MEMORY[KEYCODE_1_ADDRESS] = mostRecentKeys[1] || 0;
+  MEMORY[KEYCODE_2_ADDRESS] = mostRecentKeys[2] || 0;
   MEMORY[MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
   MEMORY[MOUSE_X_ADDRESS] = mouseX;
   MEMORY[MOUSE_Y_ADDRESS] = mouseY;
@@ -691,12 +679,14 @@ function runStop() {
     loop();
   }
   updateUI();
+  updateSpeedUI();
 }
 
 function stepOnce() {
   running = true;
   step();
   running = false;
+  drawScreen();
   updateUI();
 }
 
@@ -712,6 +702,7 @@ function loop() {
     step();
     updateUI();
   }
+  drawScreen();
   if (running) {
     setTimeout(loop, delayBetweenCycles);
   }
@@ -743,6 +734,7 @@ function init() {
   drawScreen();
   updateProgramMemoryView(MEMORY);
   updateUI();
+  updateSpeedUI();
 }
 
 // 7.BUILT-IN PROGRAMS
@@ -751,7 +743,7 @@ const PROGRAMS = {
   'Add':
 `set_value 0 4
 set_value 1 4
-add 0 1 2`,
+add_addr_addr 0 1 2`,
   'RandomPixels':
 `FillScreen:
 set_value 0 2100 ; use addr 0 to store pointer to current screen pixel
@@ -783,23 +775,20 @@ jump_to MainLoop
 
 const LINES_TO_PRINT = 20;
 
-function ge(id) {
-  return document.getElementById(id);
-}
-
-const speedEl = ge('speed');
-const stepButtonEl = ge('stepButton');
-const runButtonEl = ge('runButton');
-const workingMemoryViewEl = ge('workingMemoryView');
-const programMemoryViewEl = ge('programMemoryView');
-const inputMemoryViewEl = ge('inputMemoryView');
-const videoMemoryViewEl = ge('videoMemoryView');
-const programCounterEl = ge('programCounter');
-const programEl = ge('program');
-const runningEl = ge('running');
-const programSelectorEl = ge('programSelector');
-const canvasEl = ge('canvas');
-const canvasCtx = canvasEl.getContext('2d');
+const speedEl = document.getElementById('speed');
+const debuggerEl = document.getElementById('debugger');
+const debuggerMessageAreaEl = document.getElementById('debuggerMessageArea');
+const fullspeedEl = document.getElementById('fullspeed');
+const stepButtonEl = document.getElementById('stepButton');
+const runButtonEl = document.getElementById('runButton');
+const workingMemoryViewEl = document.getElementById('workingMemoryView');
+const programMemoryViewEl = document.getElementById('programMemoryView');
+const inputMemoryViewEl = document.getElementById('inputMemoryView');
+const videoMemoryViewEl = document.getElementById('videoMemoryView');
+const programCounterEl = document.getElementById('programCounter');
+const programEl = document.getElementById('program');
+const runningEl = document.getElementById('running');
+const programSelectorEl = document.getElementById('programSelector');
 
 let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels'; // default
 
@@ -832,6 +821,26 @@ function editProgramText() {
 
 function setSpeed() {
   delayBetweenCycles = -parseInt(speedEl.value, 10);
+  updateSpeedUI();
+}
+
+function setFullspeed() {
+  if (fullspeedEl.checked) {
+    delayBetweenCycles = 0;
+  } else {
+    delayBetweenCycles = 1;
+  }
+  updateSpeedUI();
+}
+
+function updateSpeedUI() {
+  const fullspeed = delayBetweenCycles === 0;
+  const runningAtFullspeed = running && fullspeed;
+  fullspeedEl.checked = fullspeed;
+  speedEl.value = -delayBetweenCycles;
+  debuggerEl.classList.toggle('fullspeed', runningAtFullspeed);
+  debuggerMessageAreaEl.textContent = runningAtFullspeed ?
+    'debug UI disabled when running at full speed' : '';
 }
 
 function updateUI() {
@@ -879,11 +888,10 @@ function updateInputMemoryView(memory) {
     `${KEYCODE_0_ADDRESS}: ${padRight(memory[KEYCODE_0_ADDRESS], 8)} keycode 0
 ${KEYCODE_1_ADDRESS}: ${padRight(memory[KEYCODE_1_ADDRESS], 8)} keycode 1
 ${KEYCODE_2_ADDRESS}: ${padRight(memory[KEYCODE_2_ADDRESS], 8)} keycode 2
-${KEYCODE_3_ADDRESS}: ${padRight(memory[KEYCODE_3_ADDRESS], 8)} keycode 3
 ${MOUSE_X_ADDRESS}: ${padRight(memory[MOUSE_X_ADDRESS], 8)} mouse x
 ${MOUSE_Y_ADDRESS}: ${padRight(memory[MOUSE_Y_ADDRESS], 8)} mouse y
-${MOUSE_PIXEL_ADDRESS}: ${padRight(memory[MOUSE_PIXEL_ADDRESS], 8)} mouse button
-${MOUSE_BUTTON_ADDRESS}: ${padRight(memory[MOUSE_BUTTON_ADDRESS], 8)} mouse pixel
+${MOUSE_PIXEL_ADDRESS}: ${padRight(memory[MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
+${MOUSE_BUTTON_ADDRESS}: ${padRight(memory[MOUSE_BUTTON_ADDRESS], 8)} mouse button
 ${RANDOM_NUMBER_ADDRESS}: ${padRight(memory[RANDOM_NUMBER_ADDRESS], 8)} random number`;
 }
 
@@ -893,28 +901,6 @@ function updateVideoMemoryView(memory) {
     lines.push(`${i}: ${memory[i]}`);
   }
   videoMemoryView.textContent = lines.join('\n');
-}
-
-const PIXEL_SCALE = 20;
-const CANVAS_WIDTH = SCREEN_WIDTH * PIXEL_SCALE;
-const CANVAS_HEIGHT = SCREEN_HEIGHT * PIXEL_SCALE;
-function putScreenPixelsToCanvas(pixelsRGBA) {
-  const imageData = canvasCtx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
-
-  // scale our RGBA pixels up and blit (copy) them to the canvas 
-  for (let y = 0; y < CANVAS_HEIGHT; y++) {
-    for (let x = 0; x < CANVAS_WIDTH; x++) {
-      const rowStartOffset = Math.floor(y / PIXEL_SCALE) * SCREEN_WIDTH;
-      const columnOffset = Math.floor(x / PIXEL_SCALE);
-      const index = (rowStartOffset + columnOffset) * 4; // 4 channels (rgba)
-      const indexScaled = (y * CANVAS_WIDTH + x) * 4; // 4 channels (rgba)
-      imageData.data[indexScaled] = pixelsRGBA[index];
-      imageData.data[indexScaled + 1] = pixelsRGBA[index + 1];
-      imageData.data[indexScaled + 2] = pixelsRGBA[index + 2];
-      imageData.data[indexScaled + 3] = pixelsRGBA[index + 3];
-    }
-  }
-  canvasCtx.putImageData(imageData, 0, 0);
 }
 
 function clamp(val, min, max) {

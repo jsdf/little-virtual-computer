@@ -16,15 +16,25 @@
       display: block;
       font-family: monospace;
     }
+
+    #debugger.fullspeed, #debugger.fullspeed input, #debugger.fullspeed textarea {
+      background: #eee;
+      color: #999;
+    }
+    #debuggerMessageArea {
+      font-weight: bold;
+    }
   </style>
   <button onclick="init()">load program/reset</button>
   <button id="runButton" onclick="runStop()">run/stop</button>
   <button id="stepButton" onclick="stepOnce()">step</button>
   <span id="running"></span>
-  <label>program counter <input id="programCounter"></input></label>
-  <label>speed <input id="speed" type="range" min="-500" max="0" value="0" onchange="setSpeed()"></input></label>
+  <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="setSpeed()"></input>
+  <label>full speed <input id="fullspeed" type="checkbox" checked onchange="setFullspeed()"></input></label>
   <div style="display: flex;">
-    <div style="width: 320px">
+    <div id="debugger" style="width: 320px">
+      <div id="debuggerMessageArea"></div>
+      <label>program counter <input id="programCounter"></input></label>
       working memory (slots 0 - 999):
       <textarea id="workingMemoryView" readonly rows="10" cols="40">
       </textarea>
@@ -32,7 +42,7 @@
       <textarea id="programMemoryView" readonly rows="10" cols="40">
       </textarea>
       input memory (slots 2000 - 2004):
-      <textarea id="inputMemoryView" readonly rows="6" cols="40">
+      <textarea id="inputMemoryView" readonly rows="8" cols="40">
       </textarea>
       video memory (slots 2100 - 2999):
       <textarea id="videoMemoryView" readonly rows="10" cols="40">
@@ -47,7 +57,7 @@
       </div>
     </div>
     <div style="flex: 1">
-      <canvas id="canvas" width="30" height="30" style="transform-origin: top left; transform: scale(20);image-rendering: pixelated;" onmousemove="handleMouseMove(event)"></canvas>
+      <canvas id="canvas" width="30" height="30" style="transform-origin: top left; transform: scale(20);image-rendering: pixelated;"></canvas>
     </div>
   </div>
   <script type="text/javascript" src="./computer1.js"></script>
