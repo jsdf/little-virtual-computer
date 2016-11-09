@@ -465,8 +465,7 @@ const COLOR_PALETTE = {
   15: [  0,  0,128], // Navy 
 };
 
-const canvasEl = document.getElementById('canvas');
-const canvasCtx = canvasEl.getContext('2d');
+const canvasCtx = getCanvas().getContext('2d');
 const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 /*
 Read the pixel values from video memory, look them up in our color palette, and
@@ -728,12 +727,14 @@ function init() {
     MEMORY[i] = 0;
   }
 
+  const programText = getProgramText();
   try {
-    assembleAndLoadProgram(parseProgramText(getProgramText()));
+    assembleAndLoadProgram(parseProgramText(programText));
   } catch (err) {
     alert(err.stack);
     console.error(err.stack)
   }
+  setLoadedProgramText(programText);
 
   programCounter = PROGRAM_START;
   halted = false;
@@ -781,59 +782,64 @@ jump_to MainLoop
 // boring code for rendering user interface of the simulator
 // not really important for understanding how computers work
 
-const LINES_TO_PRINT = 20;
+function $(selector) {
+  return document.querySelector(selector);
+}
 
-const speedEl = document.getElementById('speed');
-const debuggerEl = document.getElementById('debugger');
-const debuggerMessageAreaEl = document.getElementById('debuggerMessageArea');
-const fullspeedEl = document.getElementById('fullspeed');
-const stepButtonEl = document.getElementById('stepButton');
-const runButtonEl = document.getElementById('runButton');
-const workingMemoryViewEl = document.getElementById('workingMemoryView');
-const programMemoryViewEl = document.getElementById('programMemoryView');
-const inputMemoryViewEl = document.getElementById('inputMemoryView');
-const videoMemoryViewEl = document.getElementById('videoMemoryView');
-const programCounterEl = document.getElementById('programCounter');
-const programEl = document.getElementById('program');
-const runningEl = document.getElementById('running');
-const programSelectorEl = document.getElementById('programSelector');
+let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels';
 
-let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels'; // default
-
-// init program selector
-Object.keys(PROGRAMS).forEach(programName => {
-  const option = document.createElement('option');
-  option.value = programName;
-  option.textContent = programName;
-  programSelectorEl.append(option);
-});
-programSelectorEl.value = selectedProgram;
-selectProgram();
+function initUI() {
+  // init program selector
+  Object.keys(PROGRAMS).forEach(programName => {
+    const option = document.createElement('option');
+    option.value = programName;
+    option.textContent = programName;
+    $('#programSelector').append(option);
+  });
+  $('#programSelector').value = selectedProgram;
+  selectProgram();  
+}
 
 function getProgramText() {
-  return programEl.value;
+  return $('#program').value;
+}
+
+function getCanvas() {
+  return $('#canvas');
+}
+
+let loadedProgramText = null;
+function setLoadedProgramText(programText) {
+  loadedProgramText = programText;
+  $('#loadProgramButton').disabled = true;
+}
+
+function updateLoadProgramButton() {
+  $('#loadProgramButton').disabled = loadedProgramText === getProgramText();
 }
 
 function selectProgram() {
-  selectedProgram = programSelectorEl.value;
+  selectedProgram = $('#programSelector').value;
   localStorage.setItem('selectedProgram', selectedProgram);
-  programEl.value =
+  $('#program').value =
     localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram] || '';
+  updateLoadProgramButton();
 }
 
 function editProgramText() {
   if (selectedProgram.startsWith('Custom')) {
-    localStorage.setItem(selectedProgram, programEl.value);
+    localStorage.setItem(selectedProgram, $('#program').value);
   }
+  updateLoadProgramButton();
 }
 
 function setSpeed() {
-  delayBetweenCycles = -parseInt(speedEl.value, 10);
+  delayBetweenCycles = -parseInt($('#speed').value, 10);
   updateSpeedUI();
 }
 
 function setFullspeed() {
-  if (fullspeedEl.checked) {
+  if ($('#fullspeed').checked) {
     delayBetweenCycles = 0;
   } else {
     delayBetweenCycles = 1;
@@ -844,23 +850,23 @@ function setFullspeed() {
 function updateSpeedUI() {
   const fullspeed = delayBetweenCycles === 0;
   const runningAtFullspeed = running && fullspeed;
-  fullspeedEl.checked = fullspeed;
-  speedEl.value = -delayBetweenCycles;
-  debuggerEl.classList.toggle('fullspeed', runningAtFullspeed);
-  debuggerMessageAreaEl.textContent = runningAtFullspeed ?
+  $('#fullspeed').checked = fullspeed;
+  $('#speed').value = -delayBetweenCycles;
+  $('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
+  $('#debuggerMessageArea').textContent = runningAtFullspeed ?
     'debug UI disabled when running at full speed' : '';
 }
 
 function updateUI() {
-  programCounterEl.value = programCounter;
+  $('#programCounter').value = programCounter;
   if (halted) {
-    runningEl.textContent = 'halted';
-    stepButtonEl.disabled = true;
-    runButtonEl.disabled = true;
+    $('#running').textContent = 'halted';
+    $('#stepButton').disabled = true;
+    $('#runButton').disabled = true;
   } else {
-    runningEl.textContent = running ? 'running' : 'paused';
-    stepButtonEl.disabled = false;
-    runButtonEl.disabled = false;
+    $('#running').textContent = running ? 'running' : 'paused';
+    $('#stepButton').disabled = false;
+    $('#runButton').disabled = false;
   }
   updateWorkingMemoryView(MEMORY);
   updateInputMemoryView(MEMORY);
@@ -872,7 +878,7 @@ function updateWorkingMemoryView(memory) {
   for (var i = WORKING_MEMORY_START; i < WORKING_MEMORY_END; i++) {
     lines.push(`${i}: ${memory[i]}`);
   }
-  workingMemoryViewEl.textContent = lines.join('\n');
+  $('#workingMemoryView').textContent = lines.join('\n');
 }
 
 function updateProgramMemoryView(memory) {
@@ -888,11 +894,11 @@ function updateProgramMemoryView(memory) {
       i += operands.length;
     }
   }
-  programMemoryViewEl.textContent = lines.join('\n');
+  $('#programMemoryView').textContent = lines.join('\n');
 }
 
 function updateInputMemoryView(memory) {
-  inputMemoryViewEl.textContent =
+  $('#inputMemoryView').textContent =
     `${KEYCODE_0_ADDRESS}: ${padRight(memory[KEYCODE_0_ADDRESS], 8)} keycode 0
 ${KEYCODE_1_ADDRESS}: ${padRight(memory[KEYCODE_1_ADDRESS], 8)} keycode 1
 ${KEYCODE_2_ADDRESS}: ${padRight(memory[KEYCODE_2_ADDRESS], 8)} keycode 2
@@ -908,7 +914,7 @@ function updateVideoMemoryView(memory) {
   for (var i = VIDEO_MEMORY_START; i < VIDEO_MEMORY_END; i++) {
     lines.push(`${i}: ${memory[i]}`);
   }
-  videoMemoryView.textContent = lines.join('\n');
+  $('#videoMemoryView').textContent = lines.join('\n');
 }
 
 function clamp(val, min, max) {
@@ -924,4 +930,5 @@ function padRight(input, length) {
   return padded;
 }
 
+initUI();
 init();
