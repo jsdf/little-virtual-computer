@@ -92,27 +92,6 @@ function memoryGet(address) {
   return MEMORY[address];
 }
 
-/*
-We're going to use negative address values as a way of flagging 'indirect
-addresses', also known as 'pointers', so if the address is negative it should be
-used to look up another address which will actually be used for the memory access.
-*/
-function memoryGetDereferenced(address) {
-  let directAddress = address;
-  if (Math.sign(address) === -1) {
-    directAddress = memoryGet(address + 10000);
-  }
-  return memoryGet(directAddress);
-}
-
-function memorySetDereferenced(address, value) {
-  let directAddress = address;
-  if (Math.sign(address) === -1) {
-    directAddress = memoryGet(address + 10000);
-  }
-  memorySet(directAddress, value);
-}
-
 // 2.CPU
 
 /*
@@ -169,12 +148,43 @@ about each of the instructions so our simulator user interface can show it
 alongside the 'disassembled' view of the program code in memory.
 */
 const instructions = {
-  set_value: {
+  copy: {
     opcode: 9000,
+    description: 'set memory at address to the value at the given address',
+    operands: ['destination (address)', 'source (address)'],
+    execute(destination, sourceAddress) {
+      const sourceValue = memoryGet(sourceAddress);
+      memorySet(destination, sourceValue);
+    },
+  },
+  set_val: {
+    opcode: 9001,
     description: 'set memory at address to given value',
-    operands: ['address', 'value'],
-    execute(address, value) {
-      memorySetDereferenced(address, value);
+    operands: ['destination (address)', 'source (value)'],
+    execute(address, sourceValue) {
+      memorySet(address, sourceValue);
+    },
+  },
+  copy_from_ptr: {
+    opcode: 9002,
+    description: `set memory at destination address to the value at the
+address pointed to by the value at 'source' address`,
+    operands: ['destination (address)', 'source (pointer)'],
+    execute(destinationAddress, sourcePointer) {
+      const sourceAddress = memoryGet(sourcePointer);
+      const sourceValue = memoryGet(sourceAddress);
+      memorySet(destinationAddress, sourceValue);
+    },
+  },
+  copy_into_ptr: {
+    opcode: 9003,
+    description: `set memory at the address pointed to by the value at
+'destination' address to the value at the source address`,
+    operands: ['destination (pointer)', 'source (address)'],
+    execute(destinationPointer, sourceAddress) {
+      const destinationAddress = memoryGet(destinationPointer);
+      const sourceValue = memoryGet(sourceAddress);
+      memorySet(destinationAddress, sourceValue);
     },
   },
   add_addr_addr: {
@@ -183,10 +193,10 @@ const instructions = {
 address and store the result at the 'result' address`,
     operands: ['a (address)', 'b (address)', 'result (address)'],
     execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       const result = a + b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   add_addr_val: {
@@ -195,105 +205,105 @@ address and store the result at the 'result' address`,
 the result at the 'result' address`,
     operands: ['a (address)', 'b (value)', 'result (address)'],
     execute(aAddress, b, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       const result = a + b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   subtract_addr_addr: {
-    opcode: 9012,
+    opcode: 9020,
     description: `from the value at the 'a' address, subtract the value at the
 'b' address and store the result at the 'result' address`,
     operands: ['a (address)', 'b (address)', 'result (address)'],
     execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       const result = a - b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   subtract_addr_val: {
-    opcode: 9012,
+    opcode: 9021,
     description: `from the value at the 'a' address, subtract the value 'b' and
 store the result at the 'result' address`,
     operands: ['a (address)', 'b (value)', 'result (address)'],
     execute(aAddress, b, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       const result = a - b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   multiply_addr_addr: {
-    opcode: 9013,
+    opcode: 9030,
     description: `multiply the value at the 'a' address and the value at the 'b'
 address and store the result at the 'result' address`,
     operands: ['a (address)', 'b (address)', 'result (address)'],
     execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       const result = a * b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   multiply_addr_val: {
-    opcode: 9014,
+    opcode: 9031,
     description: `multiply the value at the 'a' address and the value 'b' and
 store the result at the 'result' address`,
     operands: ['a (address)', 'b (value)', 'result (address)'],
     execute(aAddress, b, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       const result = a * b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   divide_addr_addr: {
-    opcode: 9015,
+    opcode: 9040,
     description: `integer divide the value at the 'a' address by the value at
 the 'b' address and store the result at the 'result' address`,
     operands: ['a (address)', 'b (address)', 'result (address)'],
     execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       if (b === 0) throw new Error('tried to divide by zero');
       const result = Math.floor(a / b);
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   divide_addr_val: {
-    opcode: 9016,
+    opcode: 9041,
     description: `integer divide the value at the 'a' address by the value 'b'
 and store the result at the 'result' address`,
     operands: ['a (address)', 'b (value)', 'result (address)'],
     execute(aAddress, b, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       if (b === 0) throw new Error('tried to divide by zero');
       const result = Math.floor(a / b);
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   modulo_addr_addr: {
-    opcode: 9017,
+    opcode: 9050,
     description: `get the value at the 'a' address modulo the value at the 'b'
 address and store the result at the 'result' address`,
     operands: ['a (address)', 'b (address)', 'result (address)'],
     execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       if (b === 0) throw new Error('tried to modulo by zero');
       const result = a % b;
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   modulo_addr_val: {
-    opcode: 9018,
+    opcode: 9051,
     description: `get the value at the 'a' address modulo the value 'b' and
 store the result at the 'result' address`,
     operands: ['a (address)', 'b (value)', 'result (address)'],
     execute(aAddress, b, resultAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       const result = a % b;
       if (b === 0) throw new Error('tried to modulo by zero');
-      memorySetDereferenced(resultAddress, result);
+      memorySet(resultAddress, result);
     },
   },
   'jump_to':  {
@@ -312,8 +322,8 @@ so the program continues from there`,
 program continues from there`,
     operands: ['a (address)', 'b (address)', 'destination (label)'],
     execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       if (a === b)  {
         programCounter = labelAddress;
       }
@@ -326,7 +336,7 @@ program counter to the address of the label specified, so the program continues
 from there`,
     operands: ['a (address)', 'b (value)', 'destination (label)'],
     execute(aAddress, b, labelAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       if (a === b)  {
         programCounter = labelAddress;
       }
@@ -339,8 +349,8 @@ address 'b', set the program counter to the address of the label specified, so
 the program continues from there`,
     operands: ['a (address)', 'b (address)', 'destination (label)'],
     execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGetDereferenced(aAddress);
-      const b = memoryGetDereferenced(bAddress);
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
       if (a !== b)  {
         programCounter = labelAddress;
       }
@@ -353,7 +363,7 @@ the program counter to the address of the label specified, so the program
 continues from there`,
     operands: ['a (address)', 'b (value)', 'destination (label)'],
     execute(aAddress, b, labelAddress) {
-      const a = memoryGetDereferenced(aAddress);
+      const a = memoryGet(aAddress);
       if (a !== b)  {
         programCounter = labelAddress;
       }
@@ -576,15 +586,8 @@ function parseProgramText(programText) {
           continue;
         }
 
-        let indirectAddress = false;
-        if (token.startsWith('*')) {
-          indirectAddress = true;
-        }
         // Turn token text into Number value.
-        let number = parseInt(indirectAddress ? token.slice(1) : token, 10);
-        // If the token represents an indirect address, flag that by making it a
-        // negative value starting at -10000
-        number = number - (indirectAddress ? 10000 : 0);
+        let number = parseInt(token, 10);
 
         if (Number.isNaN(number)) {
           throw new Error(`couldn't parse operand ${token} at line '${line}`);
@@ -741,18 +744,19 @@ function init() {
 
 const PROGRAMS = {
   'Add':
-`set_value 0 4
-set_value 1 4
+`set_val 0 4
+set_val 1 4
 add_addr_addr 0 1 2`,
   'RandomPixels':
 `FillScreen:
-set_value 0 2100 ; use addr 0 to store pointer to current screen pixel
+set_val 0 2100 ; use addr 0 to store pointer to current screen pixel
 jump_to FillScreenLoop
 
 FillScreenLoop:
 ; modulo random value by number of colors in palette to get a color value,
 ; and write it to current screen pixel, eg. the address pointed to by address 0
-modulo_addr_val 2050 16 *0
+modulo_addr_val 2050 16 1
+copy_into_ptr 0 1
 add_addr_val 0 1 0 ; increment pointer to point to next screen pixel address
 branch_if_not_equal_addr_val 0 3000 FillScreenLoop ;if not finished, repeat
 jump_to FillScreen ;start again from the top
@@ -762,7 +766,7 @@ branch_if_equal_addr_val 2013 1 PaintAtCursor; if mouse button down, paint
 jump_to MainLoop
 
 PaintAtCursor:
-set_value *2012 3 ; set pixel at mouse cursor to color
+copy_into_ptr 2012 3 ; set pixel at mouse cursor to color
 jump_to MainLoop
 `,
   'Custom 1': '',
@@ -875,7 +879,7 @@ function updateProgramMemoryView(memory) {
     if (instruction) {
       const operands = instructions[instruction].operands;
       for (var j = 0; j < operands.length; j++) {
-        lines.push(`${padRight(i + j, 4)}: ${padRight(memory[i + j], 8)} '${operands[j]}'`);
+        lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)} '${operands[j]}'`);
       }
       i += operands.length;
     }
