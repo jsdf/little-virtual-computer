@@ -583,25 +583,37 @@ function parseProgramText(programText) {
 
         instruction.name = token; // instruction name token
       } else {
-        // label used as operand
-        if (instructionsLabelOperands.get(instruction.name) === instruction.operands.length) {
+        // handle text operands
+        if (
+          (
+            // define name
+            instruction.name === 'define' &&
+            instruction.operands.length === 0
+          ) || (
+            // label used as operand
+            instructionsLabelOperands.get(instruction.name) === instruction.operands.length
+          )
+        ) {
           instruction.operands.push(token);
           continue;
         }
 
-        // Turn token text into Number value.
-        let number = parseInt(token, 10);
-
+        // try to parse number operands
+        const number = parseInt(token, 10);
         if (Number.isNaN(number)) {
-          throw new Error(`couldn't parse operand ${token} at line '${line}`);
+          instruction.operands.push(token);
+        } else {
+          instruction.operands.push(number);
         }
-
-        instruction.operands.push(number);
       }
     }
 
-    // sanity check number of operands given
-    if (instruction.name && instruction.name !== 'label') {
+    // validate number of operands given
+    if (
+      instruction.name &&
+      instruction.name !== 'label' &&
+      instruction.name !== 'define'
+    ) {
       const expectedOperands = instructions[instruction.name].operands;
       if (instruction.operands.length !== expectedOperands.length) {
         throw new Error(`Wrong number of operands for instruction ${instruction.name}
@@ -636,11 +648,15 @@ function assembleAndLoadProgram(programInstructions) {
     if (instruction.name === 'label') {
       const labelName = instruction.operands[0];
       labelAddresses[labelName] = labelAddress;
+    } else if (instruction.name === 'define') {
+      continue;
     } else {
       // advance labelAddress by the length of the instruction and its operands
       labelAddress += 1 + instruction.operands.length;
     }
   }
+
+  const defines = {};
 
   // load instructions and operands into memory
   let loadingAddress = PROGRAM_START;
@@ -648,6 +664,11 @@ function assembleAndLoadProgram(programInstructions) {
     if (instruction.name === 'label') {
       continue;
     }
+    if (instruction.name === 'define') {
+      defines[instruction.operands[0]] = instruction.operands[1];
+      continue;
+    }
+
     // for each instruction, we first write the relevant opcode to memory
     const opcode = instructionsToOpcodes.get(instruction.name);
     if (!opcode) {
@@ -670,7 +691,18 @@ function assembleAndLoadProgram(programInstructions) {
     }
 
     for (var i = 0; i < operands.length; i++) {
-      MEMORY[loadingAddress++] = operands[i];
+      let value = null;
+      if (typeof operands[i] === 'string') {
+        if (operands[i] in defines) {
+          value = defines[operands[i]];
+        } else {
+          throw new Error(`'${operands[i]}' not defined`);
+        }
+      } else {
+        value = operands[i];
+      }
+
+      MEMORY[loadingAddress++] = value;
     }
   }
 }
@@ -749,31 +781,62 @@ function init() {
 
 const PROGRAMS = {
   'Add':
-`copy_constant 0 4
-copy_constant 1 4
-add 0 1 2`,
+`
+define a 0
+define b 1
+define result 2
+
+copy_constant a 4
+copy_constant b 4
+add a b result
+; look at memory location 2, you should now see '8'
+`,
+
   'RandomPixels':
-`FillScreen:
-copy_constant 0 2100 ; use addr 0 to store pointer to current screen pixel
+`
+define videoStartAddr 2100
+define videoEndAddr 3000
+define randomNumberAddr 2050
+define numColors 16
+
+FillScreen:
+define fillScreenPtr 0 ; address at which store address of current screen pixel in loop
+copy_constant fillScreenPtr videoStartAddr ; initialize to point to first pixel
 jump_to FillScreenLoop
 
 FillScreenLoop:
-; modulo random value by number of colors in palette to get a color value,
-; and write it to current screen pixel, eg. the address pointed to by address 0
-modulo_constant 2050 16 1
-copy_into_ptr 0 1
-add_constant 0 1 0 ; increment pointer to point to next screen pixel address
-branch_if_not_equal_constant 0 3000 FillScreenLoop ;if not finished, repeat
-jump_to FillScreen ;start again from the top
+define tempAddr 1 ; address to use for temporary storage
+
+; modulo random value by number of colors in palette to get a random color...
+modulo_constant randomNumberAddr numColors tempAddr
+
+; ...and write it to current screen pixel, eg. the address pointed to by fillScreenPtr
+copy_into_ptr fillScreenPtr tempAddr
+
+; increment pointer to point to next screen pixel address
+add_constant fillScreenPtr 1 fillScreenPtr
+
+branch_if_not_equal_constant fillScreenPtr videoEndAddr FillScreenLoop ; if not finished, repeat
+jump_to FillScreen ; filled screen, now start again from the top
 `,
-  'Paint': `MainLoop:
-branch_if_equal_constant 2013 1 PaintAtCursor; if mouse button down, paint
+
+  'Paint':
+`Init:
+copy_constant 0 3; init current color stored at addr 0
+copy_constant 1 2100 ; init loop counter to start of video memory
+DrawColorPickerLoop:
+
+branch_if_not_equal_constant 1 3000 DrawColorPickerLoop
+
+MainLoop:
+branch_if_equal_constant 2013 1 PaintAtCursor ; if mouse button down, paint
 jump_to MainLoop
 
 PaintAtCursor:
-copy_into_ptr 2012 3 ; set pixel at mouse cursor to color
+copy_into_ptr 2012 0 ; set pixel at mouse cursor to color at addr 0
 jump_to MainLoop
 `,
+
   'Custom 1': '',
   'Custom 2': '',
   'Custom 3': '',
@@ -871,6 +934,9 @@ function updateUI() {
   updateWorkingMemoryView(MEMORY);
   updateInputMemoryView(MEMORY);
   updateVideoMemoryView(MEMORY);
+  if (delayBetweenCycles > 300 || !running) {
+    scrollToProgramLine(Math.max(0, programCounter - PROGRAM_MEMORY_START - 3));
+  }
 }
 
 function updateWorkingMemoryView(memory) {
@@ -881,6 +947,7 @@ function updateWorkingMemoryView(memory) {
   $('#workingMemoryView').textContent = lines.join('\n');
 }
 
+let scrollToProgramLine = null
 function updateProgramMemoryView(memory) {
   const lines = [];
   for (var i = PROGRAM_MEMORY_START; i < PROGRAM_MEMORY_END; i++) {
@@ -894,8 +961,36 @@ function updateProgramMemoryView(memory) {
       i += operands.length;
     }
   }
-  $('#programMemoryView').textContent = lines.join('\n');
+  
+  const itemHeight = 14;
+  const renderProgramMemoryView = virtualizedScrollView(
+    $('#programMemoryView'),
+    136,
+    itemHeight,
+    lines.length,
+    (start, end) => (
+      lines.slice(start, end)
+        .map((l, i) => {
+          const current = PROGRAM_MEMORY_START + start + i === programCounter;
+          return `
+<pre
+  class="tablerow"
+  style="height: ${itemHeight}px; background: ${current ? '#eee' : 'none'}"
+>${l}</pre>
+          `;
+        })
+        .join('')
+    )
+  );
+
+  scrollToProgramLine = (item) => {
+    $('#programMemoryView').scrollTop = item * itemHeight;
+    renderProgramMemoryView(); 
+  };
+
+  renderProgramMemoryView();
 }
+
 
 function updateInputMemoryView(memory) {
   $('#inputMemoryView').textContent =
@@ -915,6 +1010,36 @@ function updateVideoMemoryView(memory) {
     lines.push(`${i}: ${memory[i]}`);
   }
   $('#videoMemoryView').textContent = lines.join('\n');
+}
+
+function virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
+  const content = document.createElement('div');
+  content.style.height = `${itemHeight * numItems}px`;
+  content.style.overflow = 'hidden';
+  container.appendChild(content);
+  container.style.height = `${containerHeight}px`;
+  container.style.overflow = 'auto';
+  const overscan = 10;
+
+  const render = () => requestAnimationFrame(() => {
+    const start = Math.max(
+      0,
+      Math.floor(container.scrollTop / itemHeight) - overscan
+    );
+    const end = Math.min(
+      numItems,
+      Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan
+    );
+    const offsetTop = start * itemHeight;
+
+    content.style.transform = `translateY(${offsetTop}px)`;
+    content.innerHTML = renderItems(start, end);
+  }, 0);
+
+  container.onscroll = render;
+
+
+  return render;
 }
 
 function clamp(val, min, max) {
