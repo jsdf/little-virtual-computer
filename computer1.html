@@ -35,18 +35,29 @@
   </style>
   <div style="display: flex;">
     <div style="width: 620px">
-      <canvas id="canvas" width="30" height="30" style="transform-origin: top left; transform: scale(20);image-rendering: pixelated;"></canvas>
+      <div style="width: 600px; height: 600px">
+        <canvas id="canvas""></canvas>
+      </div>
+      <div style="margin-top: 10px">
+        <label>
+          program:
+          <select id="programSelector" onchange="selectProgram()"></select>
+          <button id="loadProgramButton" onclick="loadProgramAndReset()">load program</button>
+        </label>
+        <textarea id="program" rows="10" cols="80" onchange="editProgramText()" onkeyup="editProgramText()" style="margin-top: 10px">
+        </textarea>
+      </div>
     </div>
     <div style="flex: 1">
       <div style="height: 30px">
         <button id="runButton" onclick="runStop()">run/stop</button>
         <button id="stepButton" onclick="stepOnce()">step</button>
-        <button onclick="init()">reset</button>
+        <button onclick="loadProgramAndReset()">reset</button>
         <span id="running"></span>
       </div>
       <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="setSpeed()"></input>
       <label>full speed <input id="fullspeed" type="checkbox" checked onchange="setFullspeed()"></input></label>
-      <div id="debugger" style="width: 310px">
+      <div id="debugger" style="width: 400px">
         <div id="debuggerMessageArea" style="height: 20px"></div>
         <label>program counter <input id="programCounter"></input></label>
         working memory (slots 0 - 999):
@@ -61,15 +72,6 @@
         video memory (slots 2100 - 2999):
         <textarea id="videoMemoryView" readonly rows="10" cols="40">
         </textarea>
-        <div>
-          <label>
-            program:
-            <select id="programSelector" onchange="selectProgram()"></select>
-            <button id="loadProgramButton" onclick="init()">load program</button>
-          </label>
-          <textarea id="program" rows="10" cols="40" onchange="editProgramText()">
-          </textarea>
-        </div>
       </div>
     </div>
   </div>

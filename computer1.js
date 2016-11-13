@@ -151,8 +151,8 @@ const instructions = {
   // this instruction is typically called 'mov', short for 'move', as in 'move
   // value at *this* address to *that* address', but this naming can be a bit
   // confusing, because the operation doesn't remove the value at the source
-  // address, as 'move' might seem to imply, so for clarity we'll call it 'copy' instead.
-  copy: {
+  // address, as 'move' might seem to imply, so for clarity we'll call it 'copy_to_from' instead.
+  copy_to_from: {
     opcode: 9000,
     description: 'set memory at address to the value at the given address',
     operands: [['destination', 'address'], ['source', 'address']],
@@ -161,7 +161,7 @@ const instructions = {
       memorySet(destination, sourceValue);
     },
   },
-  copy_constant: {
+  copy_to_from_constant: {
     opcode: 9001,
     description: 'set memory at address to the given constant value',
     operands: [['destination', 'address'], ['source', 'constant']],
@@ -169,7 +169,7 @@ const instructions = {
       memorySet(address, sourceValue);
     },
   },
-  copy_from_ptr: {
+  copy_to_from_ptr: {
     opcode: 9002,
     description: `set memory at destination address to the value at the
 address pointed to by the value at 'source' address`,
@@ -180,7 +180,7 @@ address pointed to by the value at 'source' address`,
       memorySet(destinationAddress, sourceValue);
     },
   },
-  copy_into_ptr: {
+  copy_into_ptr_from: {
     opcode: 9003,
     description: `set memory at the address pointed to by the value at
 'destination' address to the value at the source address`,
@@ -310,6 +310,42 @@ store the result at the 'result' address`,
       memorySet(resultAddress, result);
     },
   },
+  compare: {
+    opcode: 9090,
+    description: `compare the value at the 'a' address and the value at the 'b'
+address and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
+'result' address`,
+    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGet(aAddress);
+      const b = memoryGet(bAddress);
+      let result = 0;
+      if (a < b) {
+        result = -1;
+      } else if (a > b) {
+        result = 1;
+      }
+      memorySet(resultAddress, result);
+    },
+  },
+  compare_constant: {
+    opcode: 9091,
+    description: `compare the value at the 'a' address and the constant value
+'b' and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
+'result' address`,
+    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+    execute(aAddress, bAddress, resultAddress) {
+      const a = memoryGet(aAddress);
+      const b = bAddress;
+      let result = 0;
+      if (a < b) {
+        result = -1;
+      } else if (a > b) {
+        result = 1;
+      }
+      memorySet(resultAddress, result);
+    },
+  },
   'jump_to':  {
     opcode: 9100,
     description: `set the program counter to the address of the label specified,
@@ -429,6 +465,7 @@ function step() {
 
 const SCREEN_WIDTH = 30;
 const SCREEN_HEIGHT = 30;
+const SCREEN_PIXEL_SCALE = 20;
 
 /*
 To reduce the amount of memory required to contain the data for each pixel on
@@ -465,6 +502,14 @@ const COLOR_PALETTE = {
   15: [  0,  0,128], // Navy 
 };
 
+function getColor(pixelColorId, address) {
+  const color = COLOR_PALETTE[pixelColorId];
+  if (!color) {
+    throw new Error(`Invalid color code ${pixelColorId} at address ${address}`);
+  }
+  return color;
+}
+
 const canvasCtx = getCanvas().getContext('2d');
 const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 /*
@@ -482,7 +527,7 @@ function drawScreen() {
   const pixelsRGBA = imageData.data;
   for (var i = 0; i < VIDEO_MEMORY_LENGTH; i++) {
     const pixelColorId = MEMORY[VIDEO_MEMORY_START + i];
-    const colorRGB = COLOR_PALETTE[pixelColorId || 0];
+    const colorRGB = getColor(pixelColorId || 0, VIDEO_MEMORY_START + i);
     pixelsRGBA[i * 4] = colorRGB[0];
     pixelsRGBA[i * 4 + 1] = colorRGB[1];
     pixelsRGBA[i * 4 + 2] = colorRGB[2];
@@ -513,9 +558,11 @@ document.body.onmouseup = function() {
 let mouseX = 0;
 let mouseY = 0;
 
-document.getElementById('canvas').onmousemove = function(event) {
-  mouseX = event.offsetX;
-  mouseY = event.offsetY;
+const screenPageTop = getCanvas().getBoundingClientRect().top + window.scrollY;
+const screenPageLeft = getCanvas().getBoundingClientRect().left + window.scrollX;
+getCanvas().onmousemove = function(event) {
+  mouseX = Math.floor((event.pageX - screenPageTop) / SCREEN_PIXEL_SCALE);
+  mouseY = Math.floor((event.pageY - screenPageLeft) / SCREEN_PIXEL_SCALE);
 }
 
 function updateInputs() {
@@ -527,7 +574,7 @@ function updateInputs() {
   MEMORY[MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
   MEMORY[MOUSE_X_ADDRESS] = mouseX;
   MEMORY[MOUSE_Y_ADDRESS] = mouseY;
-  MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + mouseY * SCREEN_WIDTH + mouseX;
+  MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + (Math.floor(mouseY)) * SCREEN_WIDTH + Math.floor(mouseX);
   MEMORY[RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
 }
 
@@ -711,11 +758,19 @@ function assembleAndLoadProgram(programInstructions) {
 
 function runStop() {
   if (running) {
-    running = false;
+    stop();
   } else {
-    running = true;
-    loop();
+    run();
   }
+}
+
+function run() {
+  running = true;
+  loop();
+}
+
+function stop() {
+  running = false;
   updateUI();
   updateSpeedUI();
 }
@@ -732,11 +787,18 @@ let delayBetweenCycles = 0;
 const CYCLES_PER_YIELD = 997;
 function loop() {
   if (delayBetweenCycles === 0) {
+    // running full speed, execute a bunch of instructions before yielding
+    // to the JS event loop, to achieve decent 'real time' execution speed
     for (var i = 0; i < CYCLES_PER_YIELD; i++) {
-      if (!running) break;
+      if (!running) {
+        stop();
+        break;
+      }
       step();
     }
   } else {
+    // run only one execution before yielding to the JS event loop so screen
+    // and UI changes can be shown, and new mouse and keyboard input taken
     step();
     updateUI();
   }
@@ -746,7 +808,7 @@ function loop() {
   }
 }
 
-function init() {
+function loadProgramAndReset() {
   /*
   In a real computer, memory addresses which have never had any value set are
   considered 'uninitialized', and might contain any garbage value, but to keep
@@ -786,8 +848,8 @@ define a 0
 define b 1
 define result 2
 
-copy_constant a 4
-copy_constant b 4
+copy_to_from_constant a 4
+copy_to_from_constant b 4
 add a b result
 ; look at memory location 2, you should now see '8'
 `,
@@ -801,7 +863,7 @@ define numColors 16
 
 FillScreen:
 define fillScreenPtr 0 ; address at which store address of current screen pixel in loop
-copy_constant fillScreenPtr videoStartAddr ; initialize to point to first pixel
+copy_to_from_constant fillScreenPtr videoStartAddr ; initialize to point to first pixel
 jump_to FillScreenLoop
 
 FillScreenLoop:
@@ -811,7 +873,7 @@ define tempAddr 1 ; address to use for temporary storage
 modulo_constant randomNumberAddr numColors tempAddr
 
 ; ...and write it to current screen pixel, eg. the address pointed to by fillScreenPtr
-copy_into_ptr fillScreenPtr tempAddr
+copy_into_ptr_from fillScreenPtr tempAddr
 
 ; increment pointer to point to next screen pixel address
 add_constant fillScreenPtr 1 fillScreenPtr
@@ -822,18 +884,43 @@ jump_to FillScreen ; filled screen, now start again from the top
 
   'Paint':
 `Init:
-copy_constant 0 3; init current color stored at addr 0
-copy_constant 1 2100 ; init loop counter to start of video memory
-DrawColorPickerLoop:
 
-branch_if_not_equal_constant 1 3000 DrawColorPickerLoop
+define colorPickerStartAddr 2100
+define colorPickerEndAddr 2116
+define mousePixelAddr 2012
+define mouseButtonAddr 2013
+define currentColorAddr 0
+define loopCounterAddr 1
+define numColors 16
+define comparisonResultAddr 4
+define lastClickedAddr 2
+define lessThanResult -1
+
+copy_to_from_constant loopCounterAddr colorPickerStartAddr ; init loop counter to start of video memory
+copy_to_from_constant currentColorAddr 0 ; we'll use this while drawing color picker
+DrawColorPickerLoop:
+copy_into_ptr_from loopCounterAddr currentColorAddr
+add_constant loopCounterAddr 1 loopCounterAddr
+add_constant currentColorAddr 1 currentColorAddr
+branch_if_not_equal_constant loopCounterAddr colorPickerEndAddr DrawColorPickerLoop
+copy_to_from_constant currentColorAddr 3; initial color (green)
 
 MainLoop:
-branch_if_equal_constant 2013 1 PaintAtCursor ; if mouse button down, paint
+branch_if_equal_constant mouseButtonAddr loopCounterAddr HandleClick
+jump_to MainLoop
+
+HandleClick:
+copy_to_from lastClickedAddr mousePixelAddr ; store mouse location in case it changes
+compare_constant lastClickedAddr colorPickerEndAddr comparisonResultAddr
+branch_if_equal_constant comparisonResultAddr lessThanResult SelectColor
+jump_to PaintAtCursor
+
+SelectColor:
+subtract_constant lastClickedAddr colorPickerStartAddr currentColorAddr
 jump_to MainLoop
 
 PaintAtCursor:
-copy_into_ptr 2012 0 ; set pixel at mouse cursor to color at addr 0
+copy_into_ptr_from lastClickedAddr currentColorAddr ; set pixel at mouse cursor to color at currentColorAddr
 jump_to MainLoop
 `,
 
@@ -860,7 +947,7 @@ function initUI() {
     $('#programSelector').append(option);
   });
   $('#programSelector').value = selectedProgram;
-  selectProgram();  
+  selectProgram();
 }
 
 function getProgramText() {
@@ -869,6 +956,16 @@ function getProgramText() {
 
 function getCanvas() {
   return $('#canvas');
+}
+
+function initScreen(width, height, pixelScale) {
+  Object.assign(getCanvas(), {width, height});
+  // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
+  Object.assign(getCanvas().style, {
+    transformOrigin: 'top left',
+    transform: `scale(${pixelScale})`,
+    imageRendering: 'pixelated',
+  });
 }
 
 let loadedProgramText = null;
@@ -1014,14 +1111,19 @@ function updateVideoMemoryView(memory) {
 
 function virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
   const content = document.createElement('div');
-  content.style.height = `${itemHeight * numItems}px`;
-  content.style.overflow = 'hidden';
+  Object.assign(content.style, {
+    height: `${itemHeight * numItems}px`,
+    overflow: 'hidden',
+  });
   container.appendChild(content);
-  container.style.height = `${containerHeight}px`;
-  container.style.overflow = 'auto';
-  const overscan = 10;
+  Object.assign(container.style, {
+    height: `${containerHeight}px`,
+    overflow: 'auto',
+  });
 
-  const render = () => requestAnimationFrame(() => {
+  const overscan = 10; // how many rows above/below viewport to render
+
+  const renderRowsInView = () => requestAnimationFrame(() => {
     const start = Math.max(
       0,
       Math.floor(container.scrollTop / itemHeight) - overscan
@@ -1036,10 +1138,9 @@ function virtualizedScrollView(container, containerHeight, itemHeight, numItems,
     content.innerHTML = renderItems(start, end);
   }, 0);
 
-  container.onscroll = render;
+  container.onscroll = renderRowsInView;
 
-
-  return render;
+  return renderRowsInView;
 }
 
 function clamp(val, min, max) {
@@ -1055,5 +1156,6 @@ function padRight(input, length) {
   return padded;
 }
 
+initScreen(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_PIXEL_SCALE);
 initUI();
-init();
+loadProgramAndReset();
