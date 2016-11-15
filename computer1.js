@@ -5,9 +5,10 @@ Components: (do a ctrl-f find for them)
 2.CPU
 3.DISPLAY
 4.INPUT
-5.ASSEMBLER
-6.SIMULATION CONTROL
-7.BUILT-IN PROGRAMS
+5.SOUND
+6.ASSEMBLER
+7.SIMULATION CONTROL
+8.BUILT-IN PROGRAMS
 
 */
 
@@ -54,7 +55,7 @@ devices.
   row, from the top left. For example, the top row uses slots 2100 - 2129, and
   the bottom row uses slots 2970 - 3000.
 */
-const TOTAL_MEMORY_SIZE = 3000;
+const TOTAL_MEMORY_SIZE = 3100;
 const WORKING_MEMORY_START = 0;
 const WORKING_MEMORY_END = 1000;
 const PROGRAM_MEMORY_START = 1000;
@@ -66,16 +67,26 @@ const MOUSE_X_ADDRESS = 2010;
 const MOUSE_Y_ADDRESS = 2011;
 const MOUSE_PIXEL_ADDRESS = 2012;
 const MOUSE_BUTTON_ADDRESS = 2013;
-const RANDOM_NUMBER_ADDRESS = 2050
+const RANDOM_NUMBER_ADDRESS = 2050;
+const CURRENT_TIME_ADDRESS = 2051;
 const VIDEO_MEMORY_START = 2100;
 const VIDEO_MEMORY_END = 3000;
+const AUDIO_CH1_WAVETYPE_ADDRESS = 3000;
+const AUDIO_CH1_FREQUENCY_ADDRESS = 3001;
+const AUDIO_CH1_VOLUME_ADDRESS = 3002;
+const AUDIO_CH2_WAVETYPE_ADDRESS = 3003;
+const AUDIO_CH2_FREQUENCY_ADDRESS = 3004;
+const AUDIO_CH2_VOLUME_ADDRESS = 3005;
+const AUDIO_CH3_WAVETYPE_ADDRESS = 3006;
+const AUDIO_CH3_FREQUENCY_ADDRESS = 3007;
+const AUDIO_CH3_VOLUME_ADDRESS = 3008;
 
 // The program will be loaded into the region of memory starting at this slot.
 const PROGRAM_START = 1000;
 
 // Store a value at a certain address in memory
 function memorySet(address, value) {
-  if (Number.isNaN(value)) {
+  if (isNaN(value)) {
     throw new Error(`tried to write to an invalid value at ${address}`);
   }
   if (address < 0 || address >= TOTAL_MEMORY_SIZE) {
@@ -154,7 +165,7 @@ const instructions = {
   // address, as 'move' might seem to imply, so for clarity we'll call it 'copy_to_from' instead.
   copy_to_from: {
     opcode: 9000,
-    description: 'set memory at address to the value at the given address',
+    description: 'set value at address to the value at the given address',
     operands: [['destination', 'address'], ['source', 'address']],
     execute(destination, sourceAddress) {
       const sourceValue = memoryGet(sourceAddress);
@@ -163,7 +174,7 @@ const instructions = {
   },
   copy_to_from_constant: {
     opcode: 9001,
-    description: 'set memory at address to the given constant value',
+    description: 'set value at address to the given constant value',
     operands: [['destination', 'address'], ['source', 'constant']],
     execute(address, sourceValue) {
       memorySet(address, sourceValue);
@@ -171,7 +182,7 @@ const instructions = {
   },
   copy_to_from_ptr: {
     opcode: 9002,
-    description: `set memory at destination address to the value at the
+    description: `set value at destination address to the value at the
 address pointed to by the value at 'source' address`,
     operands: [['destination', 'address'], ['source', 'pointer']],
     execute(destinationAddress, sourcePointer) {
@@ -182,13 +193,22 @@ address pointed to by the value at 'source' address`,
   },
   copy_into_ptr_from: {
     opcode: 9003,
-    description: `set memory at the address pointed to by the value at
+    description: `set value at the address pointed to by the value at
 'destination' address to the value at the source address`,
     operands: [['destination', 'pointer'], ['source', 'address']],
     execute(destinationPointer, sourceAddress) {
       const destinationAddress = memoryGet(destinationPointer);
       const sourceValue = memoryGet(sourceAddress);
       memorySet(destinationAddress, sourceValue);
+    },
+  },
+  copy_address_of_label: {
+    opcode: 9004,
+    description: `set value at destination address to the address of the label
+given`,
+    operands: [['destination', 'address'], ['source', 'label']],
+    execute(destinationAddress, labelAddress) {
+      memorySet(destinationAddress, labelAddress);
     },
   },
   add: {
@@ -409,6 +429,15 @@ continues from there`,
       }
     },
   },
+  'data': {
+    opcode: 9200,
+    description: `operands given will be included in the program when it is
+compiled at the position that they appear in the code, so you can use a label to
+get the address of the data and access it`,
+    operands: [],
+    execute() {
+    },
+  }, 
   'break': {
     opcode: 9998,
     description: 'pause program execution, so it must be resumed via simulator UI',
@@ -547,12 +576,12 @@ document.body.onkeyup = function(event) {
   keysPressed.delete(event.which);
 }
 
-let mouseDown = 0;
+let mouseDown = false;
 document.body.onmousedown = function() { 
-  ++mouseDown;
+  mouseDown = true;
 }
 document.body.onmouseup = function() {
-  --mouseDown;
+  mouseDown = false;
 }
 
 let mouseX = 0;
@@ -576,9 +605,89 @@ function updateInputs() {
   MEMORY[MOUSE_Y_ADDRESS] = mouseY;
   MEMORY[MOUSE_PIXEL_ADDRESS] = VIDEO_MEMORY_START + (Math.floor(mouseY)) * SCREEN_WIDTH + Math.floor(mouseX);
   MEMORY[RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
+  MEMORY[CURRENT_TIME_ADDRESS] = Date.now();
 }
 
-// 5.ASSEMBLER
+// 5.SOUND
+
+const WAVETYPES = {
+  0: 'square',
+  1: 'saw',
+  2: 'triangle',
+  3: 'sine',
+};
+
+const MAX_GAIN = 0.15;
+const audioCtx = new AudioContext();
+
+function makeAudioChannel(wavetypeAddr, freqAddr, volAddr) {
+  const oscillatorNode = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillatorNode.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  const state = {
+    gain: 0,
+    oscillatorType: 'square',
+    frequency: 440,
+  };
+
+  gainNode.gain.value = state.gain;
+  oscillatorNode.type = state.oscillatorType;
+  oscillatorNode.frequency.value = state.frequency;
+  oscillatorNode.start();
+
+  return {
+    state,
+    wavetypeAddr,
+    freqAddr,
+    volAddr,
+    gainNode,
+    oscillatorNode,
+  };
+}
+
+const audioChannels = [
+  makeAudioChannel(
+    AUDIO_CH1_WAVETYPE_ADDRESS,
+    AUDIO_CH1_FREQUENCY_ADDRESS,
+    AUDIO_CH1_VOLUME_ADDRESS
+  ),
+  makeAudioChannel(
+    AUDIO_CH2_WAVETYPE_ADDRESS,
+    AUDIO_CH2_FREQUENCY_ADDRESS,
+    AUDIO_CH2_VOLUME_ADDRESS
+  ),
+  makeAudioChannel(
+    AUDIO_CH3_WAVETYPE_ADDRESS,
+    AUDIO_CH3_FREQUENCY_ADDRESS,
+    AUDIO_CH3_VOLUME_ADDRESS
+  ),
+];
+
+function updateAudio() {
+  audioChannels.forEach(channel => {
+    const frequency = (MEMORY[channel.freqAddr] || 0) / 1000;
+    const gain = !running ? 0 : (MEMORY[channel.volAddr] || 0) / 100 * MAX_GAIN;
+    const oscillatorType = WAVETYPES[MEMORY[channel.wavetypeAddr] || 0];
+
+    const {state} = channel;
+    if (state.gain !== gain) {
+      channel.gainNode.gain.setValueAtTime(gain, audioCtx.currentTime);
+      state.gain = gain;
+    }
+    if (state.oscillatorType !== oscillatorType) {
+      channel.oscillatorNode.type = oscillatorType;
+      state.oscillatorType = oscillatorType;
+    }
+    if (state.frequency !== frequency) {
+      channel.oscillatorNode.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+      state.frequency = frequency;
+    }
+  });
+}
+
+// 6.ASSEMBLER
 
 /*
 We use a simple text-based language to input our program. This is our 'assembly
@@ -610,11 +719,11 @@ Object.keys(instructions).forEach(name => {
 function parseProgramText(programText) {
   const programInstructions = [];
   const lines = programText.split('\n');
-  for (const line of lines) {
+  for (let line of lines) {
     const instruction = {name: null, operands: []};
     let tokens = line.replace(/;.*$/, '') // strip comments
       .split(' ');
-    for (const token of tokens) {
+    for (let token of tokens) {
       // skip empty tokens
       if (token == null || token == "") {
         continue;
@@ -659,6 +768,7 @@ function parseProgramText(programText) {
     if (
       instruction.name &&
       instruction.name !== 'label' &&
+      instruction.name !== 'data' &&
       instruction.name !== 'define'
     ) {
       const expectedOperands = instructions[instruction.name].operands;
@@ -691,7 +801,7 @@ function assembleAndLoadProgram(programInstructions) {
   // the memory locations in the assembled program which the labels refer to.
   const labelAddresses = {};
   let labelAddress = PROGRAM_START;
-  for (const instruction of programInstructions) {
+  for (let instruction of programInstructions) {
     if (instruction.name === 'label') {
       const labelName = instruction.operands[0];
       labelAddresses[labelName] = labelAddress;
@@ -707,12 +817,19 @@ function assembleAndLoadProgram(programInstructions) {
 
   // load instructions and operands into memory
   let loadingAddress = PROGRAM_START;
-  for (const instruction of programInstructions) {
+  for (let instruction of programInstructions) {
     if (instruction.name === 'label') {
       continue;
     }
     if (instruction.name === 'define') {
       defines[instruction.operands[0]] = instruction.operands[1];
+      continue;
+    }
+
+    if (instruction.name === 'data') {
+      for (var i = 0; i < instruction.operands.length; i++) {
+        MEMORY[loadingAddress++] = instruction.operands[i];
+      }
       continue;
     }
 
@@ -754,7 +871,7 @@ function assembleAndLoadProgram(programInstructions) {
   }
 }
 
-// 6.SIMULATION CONTROL
+// 7.SIMULATION CONTROL
 
 function runStop() {
   if (running) {
@@ -766,6 +883,8 @@ function runStop() {
 
 function run() {
   running = true;
+  updateUI();
+  updateSpeedUI();
   loop();
 }
 
@@ -779,7 +898,7 @@ function stepOnce() {
   running = true;
   step();
   running = false;
-  drawScreen();
+  updateOutputs();
   updateUI();
 }
 
@@ -802,7 +921,7 @@ function loop() {
     step();
     updateUI();
   }
-  drawScreen();
+  updateOutputs();
   if (running) {
     setTimeout(loop, delayBetweenCycles);
   }
@@ -833,13 +952,18 @@ function loadProgramAndReset() {
   programCounter = PROGRAM_START;
   halted = false;
   running = false;
-  drawScreen();
+  updateOutputs();
   updateProgramMemoryView(MEMORY);
   updateUI();
   updateSpeedUI();
 }
 
-// 7.BUILT-IN PROGRAMS
+function updateOutputs() {
+  drawScreen();
+  updateAudio();
+}
+
+// 8.BUILT-IN PROGRAMS
 
 const PROGRAMS = {
   'Add':
@@ -924,6 +1048,298 @@ copy_into_ptr_from lastClickedAddr currentColorAddr ; set pixel at mouse cursor 
 jump_to MainLoop
 `,
 
+  'ChocolateRain': `
+define accumulatorAddr 0
+define dataTempAddr 1
+define musicPlayheadPtr 2
+define startTimeAddr 3
+define channelDestinationPtr 4
+define currentTimeAddr 2051
+define beatLengthInMS 250
+define ch1WaveTypeAddr 3000
+define ch1FreqAddr 3001
+define ch2WaveTypeAddr 3003
+
+copy_to_from_constant ch1WaveTypeAddr 2 ; triange
+copy_to_from_constant ch2WaveTypeAddr 0 ; square
+
+Reset:
+copy_to_from startTimeAddr currentTimeAddr ; keep time started to calculate time elapsed
+
+copy_address_of_label musicPlayheadPtr MusicData
+
+WaitForEvent:
+; calculate current beat from time
+subtract currentTimeAddr startTimeAddr accumulatorAddr
+divide_constant accumulatorAddr beatLengthInMS accumulatorAddr
+copy_to_from_ptr dataTempAddr musicPlayheadPtr
+
+branch_if_equal_constant dataTempAddr -1 Reset
+compare accumulatorAddr dataTempAddr dataTempAddr
+branch_if_not_equal_constant dataTempAddr -1 PlayNote
+jump_to WaitForEvent
+
+PlayNote:
+; advance source pointer to channel data
+add_constant musicPlayheadPtr 1 musicPlayheadPtr
+
+; move dest pointer to frequency address for channel
+copy_to_from_constant channelDestinationPtr ch1FreqAddr ; move to ch1FreqAddr
+; in dataTempAddr, calculate relative offset of channel's frequency address from ch1FreqAddr
+copy_to_from_ptr dataTempAddr musicPlayheadPtr
+multiply_constant dataTempAddr 3 dataTempAddr
+; increment pointer by channel offset to point to correct channel's frequency address
+add channelDestinationPtr dataTempAddr channelDestinationPtr
+
+add_constant musicPlayheadPtr 1 musicPlayheadPtr ; advance source pointer to frequency data
+
+; copy frequency
+copy_to_from_ptr dataTempAddr musicPlayheadPtr
+copy_into_ptr_from channelDestinationPtr dataTempAddr
+
+; move destination pointer to volume address for channel
+add_constant channelDestinationPtr 1 channelDestinationPtr
+; advance source pointer to volume dataTempAddr
+add_constant musicPlayheadPtr 1 musicPlayheadPtr
+
+; copy volume
+copy_to_from_ptr dataTempAddr musicPlayheadPtr
+copy_into_ptr_from channelDestinationPtr dataTempAddr
+
+add_constant musicPlayheadPtr 1 musicPlayheadPtr ; advance to next music event
+jump_to WaitForEvent
+
+MusicData:
+data  0 1 195997  53
+data  0 0 622253  53
+data  0 0 130812  53
+data  1 0 622253  0
+data  1 0 622253  58
+data  2 1 195997  0
+data  2 1 155563  56
+data  2 0 130812  0
+data  2 0 622253  0
+data  2 0 783990  68
+data  3 0 783990  0
+data  3 0 523251  49
+data  4 1 155563  0
+data  4 1 195997  64
+data  4 0 523251  0
+data  4 0 698456  64
+data  4 0 233081  52
+data  5 0 698456  0
+data  5 0 466163  50
+data  6 1 195997  0
+data  6 0 233081  0
+data  6 0 466163  0
+data  6 0 587329  64
+data  7 0 587329  0
+data  7 0 622253  60
+data  7 0 195997  51
+data  8 0 622253  0
+data  8 0 311126  43
+data  9 0 195997  0
+data  9 0 311126  0
+data  9 0 523251  69
+data  10  0 523251  0
+data  10  0 391995  50
+data  11  0 391995  0
+data  11  0 587329  71
+data  11  0 146832  50
+data  12  0 146832  0
+data  12  0 587329  0
+data  12  0 391995  50
+data  13  0 391995  0
+data  13  0 466163  61
+data  14  0 466163  0
+data  14  0 523251  63
+data  14  0 155563  50
+data  15  1 146832  50
+data  15  0 523251  0
+data  15  0 391995  51
+data  16  1 146832  0
+data  16  1 155563  57
+data  16  0 155563  0
+data  16  0 391995  0
+data  16  0 622253  68
+data  16  0 207652  60
+data  17  0 622253  0
+data  17  0 622253  60
+data  18  1 155563  0
+data  18  1 195997  62
+data  18  0 207652  0
+data  18  0 622253  0
+data  18  0 783990  63
+data  18  0 311126  70
+data  19  1 195997  0
+data  19  1 174614  54
+data  19  0 783990  0
+data  19  0 523251  46
+data  20  1 174614  0
+data  20  0 311126  0
+data  20  0 523251  0
+data  20  0 698456  66
+data  20  0 293664  57
+data  21  1 146832  55
+data  21  0 698456  0
+data  21  0 466163  51
+data  22  0 293664  0
+data  22  0 466163  0
+data  22  0 587329  65
+data  22  0 233081  52
+data  23  1 146832  0
+data  23  1 155563  59
+data  23  0 233081  0
+data  23  0 587329  0
+data  23  0 622253  63
+data  23  0 261625  65
+data  24  0 622253  0
+data  24  0 311126  41
+data  25  1 155563  0
+data  25  1 130812  57
+data  25  0 261625  0
+data  25  0 311126  0
+data  25  0 523251  66
+data  25  0 195997  58
+data  26  0 523251  0
+data  26  0 391995  53
+data  27  1 130812  0
+data  27  1 146832  60
+data  27  0 195997  0
+data  27  0 391995  0
+data  27  0 587329  69
+data  27  0 233081  63
+data  28  0 587329  0
+data  28  0 391995  52
+data  29  1 146832  0
+data  29  1 116540  56
+data  29  0 233081  0
+data  29  0 391995  0
+data  29  0 466163  59
+data  30  1 116540  0
+data  30  1 130812  63
+data  30  0 466163  0
+data  30  0 523251  61
+data  30  0 261625  56
+data  31  0 523251  0
+data  31  0 391995  50
+data  32  1 130812  0
+data  32  1 233081  65
+data  32  0 261625  0
+data  32  0 391995  0
+data  32  0 622253  73
+data  32  0 207652  53
+data  33  0 622253  0
+data  33  0 622253  60
+data  34  1 233081  0
+data  34  1 155563  52
+data  34  0 207652  0
+data  34  0 622253  0
+data  34  0 783990  64
+data  35  0 783990  0
+data  35  0 523251  50
+data  36  1 155563  0
+data  36  1 195997  62
+data  36  0 523251  0
+data  36  0 932327  71
+data  36  0 174614  53
+data  37  0 932327  0
+data  37  0 466163  43
+data  38  1 195997  0
+data  38  0 174614  0
+data  38  0 466163  0
+data  38  0 587329  62
+data  39  0 587329  0
+data  39  0 622253  60
+data  39  0 261625  50
+data  40  0 622253  0
+data  40  0 311126  43
+data  41  0 261625  0
+data  41  0 311126  0
+data  41  0 523251  66
+data  42  0 523251  0
+data  42  0 391995  53
+data  43  0 391995  0
+data  43  0 587329  68
+data  43  0 293664  55
+data  44  0 293664  0
+data  44  0 587329  0
+data  44  0 391995  49
+data  45  0 391995  0
+data  45  0 466163  67
+data  46  0 466163  0
+data  46  0 523251  67
+data  46  0 311126  50
+data  47  1 146832  54
+data  47  0 523251  0
+data  47  0 523251  61
+data  48  1 146832  0
+data  48  1 155563  60
+data  48  0 311126  0
+data  48  0 523251  0
+data  48  0 1046502 71
+data  48  0 207652  53
+data  49  0 1046502 0
+data  49  0 523251  45
+data  50  1 155563  0
+data  50  1 195997  64
+data  50  0 207652  0
+data  50  0 523251  0
+data  50  0 783990  68
+data  51  1 195997  0
+data  51  1 174614  60
+data  51  0 783990  0
+data  51  0 783990  58
+data  52  1 174614  0
+data  52  0 783990  0
+data  52  0 932327  64
+data  52  0 195997  53
+data  53  1 146832  50
+data  53  0 932327  0
+data  53  0 466163  43
+data  54  0 195997  0
+data  54  0 466163  0
+data  54  0 698456  64
+data  55  1 146832  0
+data  55  1 155563  58
+data  55  0 698456  0
+data  55  0 783990  64
+data  55  0 207652  51
+data  56  0 783990  0
+data  56  0 415304  43
+data  57  1 155563  0
+data  57  1 130812  56
+data  57  0 207652  0
+data  57  0 415304  0
+data  57  0 622253  67
+data  58  0 622253  0
+data  58  0 523251  56
+data  59  1 130812  0
+data  59  1 146832  57
+data  59  0 523251  0
+data  59  0 698456  71
+data  59  0 233081  57
+data  60  0 233081  0
+data  60  0 698456  0
+data  60  0 466163  49
+data  61  1 146832  0
+data  61  1 116540  52
+data  61  0 466163  0
+data  61  0 587329  64
+data  62  1 116540  0
+data  62  1 130812  57
+data  62  0 587329  0
+data  62  0 622253  62
+data  62  0 261625  56
+data  64  1 130812  0
+data  64  1 195997  64
+data  64  0 261625  0
+data  64  0 622253  0
+data  64  0 622253  61
+data  64  0 130812  52
+data -1
+`,
+
   'Custom 1': '',
   'Custom 2': '',
   'Custom 3': '',
@@ -959,12 +1375,17 @@ function getCanvas() {
 }
 
 function initScreen(width, height, pixelScale) {
+  let imageRendering = 'pixelated';
+  if (/firefox/i.test(navigator.userAgent)) {
+    imageRendering = '-moz-crisp-edges';
+  }
   Object.assign(getCanvas(), {width, height});
   // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
   Object.assign(getCanvas().style, {
     transformOrigin: 'top left',
     transform: `scale(${pixelScale})`,
-    imageRendering: 'pixelated',
+    '-ms-interpolation-mode': 'nearest-neighbor',
+    imageRendering,
   });
 }
 
@@ -1031,6 +1452,7 @@ function updateUI() {
   updateWorkingMemoryView(MEMORY);
   updateInputMemoryView(MEMORY);
   updateVideoMemoryView(MEMORY);
+  updateAudioMemoryView(MEMORY);
   if (delayBetweenCycles > 300 || !running) {
     scrollToProgramLine(Math.max(0, programCounter - PROGRAM_MEMORY_START - 3));
   }
@@ -1088,7 +1510,6 @@ function updateProgramMemoryView(memory) {
   renderProgramMemoryView();
 }
 
-
 function updateInputMemoryView(memory) {
   $('#inputMemoryView').textContent =
     `${KEYCODE_0_ADDRESS}: ${padRight(memory[KEYCODE_0_ADDRESS], 8)} keycode 0
@@ -1107,6 +1528,19 @@ function updateVideoMemoryView(memory) {
     lines.push(`${i}: ${memory[i]}`);
   }
   $('#videoMemoryView').textContent = lines.join('\n');
+}
+
+function updateAudioMemoryView(memory) {
+  $('#audioMemoryView').textContent =
+`${AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(memory[AUDIO_CH1_WAVETYPE_ADDRESS], 8)} AUDIO_CH1_WAVETYPE
+${AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(memory[AUDIO_CH1_FREQUENCY_ADDRESS], 8)} AUDIO_CH1_FREQUENCY
+${AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(memory[AUDIO_CH1_VOLUME_ADDRESS], 8)} AUDIO_CH1_VOLUME
+${AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(memory[AUDIO_CH2_WAVETYPE_ADDRESS], 8)} AUDIO_CH2_WAVETYPE
+${AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(memory[AUDIO_CH2_FREQUENCY_ADDRESS], 8)} AUDIO_CH2_FREQUENCY
+${AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(memory[AUDIO_CH2_VOLUME_ADDRESS], 8)} AUDIO_CH2_VOLUME
+${AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(memory[AUDIO_CH3_WAVETYPE_ADDRESS], 8)} AUDIO_CH3_WAVETYPE
+${AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(memory[AUDIO_CH3_FREQUENCY_ADDRESS], 8)} AUDIO_CH3_FREQUENCY
+${AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(memory[AUDIO_CH3_VOLUME_ADDRESS], 8)} AUDIO_CH3_VOLUME`;
 }
 
 function virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
