@@ -1055,13 +1055,13 @@ define musicPlayheadPtr 2
 define startTimeAddr 3
 define channelDestinationPtr 4
 define currentTimeAddr 2051
-define beatLengthInMS 250
+define beatLengthInMS 200
 define ch1WaveTypeAddr 3000
 define ch1FreqAddr 3001
 define ch2WaveTypeAddr 3003
 
 copy_to_from_constant ch1WaveTypeAddr 3 ; sine
-copy_to_from_constant ch2WaveTypeAddr 1 ; sawtooth
+copy_to_from_constant ch2WaveTypeAddr 0 ; sawtooth
 
 Reset:
 copy_to_from startTimeAddr currentTimeAddr ; keep time started to calculate time elapsed
@@ -1108,6 +1108,7 @@ copy_into_ptr_from channelDestinationPtr dataTempAddr
 
 add_constant musicPlayheadPtr 1 musicPlayheadPtr ; advance to next music event
 jump_to WaitForEvent
+
 
 MusicData:
 data  0 1 195997  53
@@ -1544,33 +1545,30 @@ ${AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(memory[AUDIO_CH3_VOLUME_ADDRESS], 8)} AU
 }
 
 function virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
+  Object.assign(container.style, {
+    height: `${containerHeight}px`,
+    overflow: 'auto',
+  });
   const content = document.createElement('div');
   Object.assign(content.style, {
     height: `${itemHeight * numItems}px`,
     overflow: 'hidden',
   });
   container.appendChild(content);
-  Object.assign(container.style, {
-    height: `${containerHeight}px`,
-    overflow: 'auto',
-  });
+
+  const rows = document.createElement('div');
+  content.appendChild(rows);
 
   const overscan = 10; // how many rows above/below viewport to render
 
   const renderRowsInView = () => requestAnimationFrame(() => {
-    const start = Math.max(
-      0,
-      Math.floor(container.scrollTop / itemHeight) - overscan
-    );
-    const end = Math.min(
-      numItems,
-      Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan
-    );
+    const start = Math.max(0, Math.floor(container.scrollTop / itemHeight) - overscan);
+    const end = Math.min(numItems, Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan);
     const offsetTop = start * itemHeight;
 
-    content.style.transform = `translateY(${offsetTop}px)`;
-    content.innerHTML = renderItems(start, end);
-  }, 0);
+    rows.style.transform = `translateY(${offsetTop}px)`;
+    rows.innerHTML = renderItems(start, end);
+  });
 
   container.onscroll = renderRowsInView;
 
