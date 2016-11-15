@@ -612,7 +612,7 @@ function updateInputs() {
 
 const WAVETYPES = {
   0: 'square',
-  1: 'saw',
+  1: 'sawtooth',
   2: 'triangle',
   3: 'sine',
 };
@@ -1060,8 +1060,8 @@ define ch1WaveTypeAddr 3000
 define ch1FreqAddr 3001
 define ch2WaveTypeAddr 3003
 
-copy_to_from_constant ch1WaveTypeAddr 2 ; triange
-copy_to_from_constant ch2WaveTypeAddr 0 ; square
+copy_to_from_constant ch1WaveTypeAddr 3 ; sine
+copy_to_from_constant ch2WaveTypeAddr 1 ; sawtooth
 
 Reset:
 copy_to_from startTimeAddr currentTimeAddr ; keep time started to calculate time elapsed
