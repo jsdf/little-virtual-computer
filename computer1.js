@@ -140,320 +140,344 @@ function advanceProgramCounter() {
 }
 
 /*
-These instructions represent the things the CPU can be told to do. We
+'Instructions' are what we call the things a CPU can be told to do. We
 implement them here with code, but a real CPU would have circuitry
-implementing each one of these possible actions, which include things like
-loading data from memory, comparing it, operating on and combining it, and
+implementing each one of these possible operations, which include things like
+loading data from memory, comparing it, transforming or combining it, and
 storing it back into memory.
 
 We assign numerical values called 'opcodes' to each of the instructions. When
 our program is 'assembled' from the program code text, the version of the
 program that we actually load into memory will use these numeric codes to refer
-to the CPU instructions in place of the textual names as a numeric value is a
-more efficient representation, especially as computers only directly understand
-numbers, whereas text is an abstraction on top of number values.
+to the CPU instructions instead of the textual names, as numeric values are the
+only representation of values that computer hardware can directly understand.
+Computers actually represent text as numeric values internally (we'll look
+that works later), but using a single numeric value for each instruction also
+allows our compiled program to be smaller in size.
 
-We'll make the opcodes numbers starting at 9000 to make the values a bit more
-distinctive when we see them in the memory viewer. We'll include some extra info
-about each of the instructions so our simulator user interface can show it
-alongside the 'disassembled' view of the program code in memory.
+You can think of instructions as being similar to functions in Javascript, as
+each has a name and can take a number of 'operands', which are like arguments to
+a function.
+
+One interesting detail about instruction operands is that a single
+instruction might have several variants which each take different types of
+operands.
+
+For example, the 'add' instruction might take a three memory addresses as
+operands, like so:
+
+add addr:0 addr:1 addr:0
+
+Which effectively says you want to add the value at memory address 0 to the
+value at memory address 1, and store the result in memory address 0 (overwriting
+the value that was previously there). However, you could also use the 'add'
+instruction with a constant numerical value as the second operands:
+
+add addr:0 val:42 addr:0
+
+This would tell the instruction you want to add the value at memory address 0 to
+the numerical value 42, and store the result in memory address 0. These variants
+are called 'addressing modes', and they give us more flexibility with how we use
+our instructions. In our computer we will have the following addressing modes:
+
+Immediate
+An operand which is a value to be used directly (rather than loaded from
+some memory address). Example:
+
+val:123
+
+Direct (a.k.a. Absolute)
+An operand which is an absolute memory address in our computer's address space.
+Example:
+
+addr:10
+
+A label can be used in place of the numeric value to get the address of that
+label in the program code. Example:
+
+addr:MyData
+
+Indirect (a.k.a. Pointer, Reference, Handle)
+An operand which is the address of a location in memory containing value another
+memory address, in turn containing the value will to be read or written by the
+instruction. Example:
+
+ptr:20
+
+Instead of implementing each instruction multiple times to handle each of the
+possible addressing modes, we will specify which addressing modes each
+instruction supports, and we'll have different opcodes for each possible
+combination of operand types.
+
 */
-const instructions = {
-  // this instruction is typically called 'mov', short for 'move', as in 'move
-  // value at *this* address to *that* address', but this naming can be a bit
-  // confusing, because the operation doesn't remove the value at the source
-  // address, as 'move' might seem to imply, so for clarity we'll call it 'copy_to_from' instead.
-  copy_to_from: {
-    opcode: 9000,
-    description: 'set value at address to the value at the given address',
-    operands: [['destination', 'address'], ['source', 'address']],
-    execute(destination, sourceAddress) {
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destination, sourceValue);
-    },
+
+const instructions = {};
+/*
+In x86 assembly, this instruction is called 'mov' (short for 'move') as in
+'move value at *this* address to *that* address', but this naming can be a bit
+confusing, because the operation doesn't remove the value at the source
+address, as 'move' might seem to imply, so for clarity we'll call it 'copy'
+instead.
+*/
+instructions['copy'] = {
+  description: 'set value at address to the value at the given address',
+  operands: [['destination', 'address'], ['source', 'value']],
+  execute(destination, sourceValue) {
+    memorySet(destination, sourceValue);
   },
-  copy_to_from_constant: {
-    opcode: 9001,
-    description: 'set value at address to the given constant value',
-    operands: [['destination', 'address'], ['source', 'constant']],
-    execute(address, sourceValue) {
-      memorySet(address, sourceValue);
-    },
-  },
-  copy_to_from_ptr: {
-    opcode: 9002,
-    description: `set value at destination address to the value at the
-address pointed to by the value at 'source' address`,
-    operands: [['destination', 'address'], ['source', 'pointer']],
-    execute(destinationAddress, sourcePointer) {
-      const sourceAddress = memoryGet(sourcePointer);
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destinationAddress, sourceValue);
-    },
-  },
-  copy_into_ptr_from: {
-    opcode: 9003,
-    description: `set value at the address pointed to by the value at
-'destination' address to the value at the source address`,
-    operands: [['destination', 'pointer'], ['source', 'address']],
-    execute(destinationPointer, sourceAddress) {
-      const destinationAddress = memoryGet(destinationPointer);
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destinationAddress, sourceValue);
-    },
-  },
-  copy_address_of_label: {
-    opcode: 9004,
-    description: `set value at destination address to the address of the label
-given`,
-    operands: [['destination', 'address'], ['source', 'label']],
-    execute(destinationAddress, labelAddress) {
-      memorySet(destinationAddress, labelAddress);
-    },
-  },
-  add: {
-    opcode: 9010,
-    description: `add the value at the 'a' address with the value at the 'b'
+  addressingModes: [
+    {opcode: 1000, operandTypes: ['address', 'address']},
+    {opcode: 1001, operandTypes: ['address', 'constant']},
+    {opcode: 1002, operandTypes: ['address', 'pointer']},
+    {opcode: 1003, operandTypes: ['pointer', 'address']},
+    {opcode: 1004, operandTypes: ['pointer', 'constant']},
+  ],
+};
+instructions['add'] = {
+  description: `add the value at the 'a' address with the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a + b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'value'], ['b', 'value'], ['result', 'address']],
+  execute(a, b, resultAddress) {
+    const result = a + b;
+    memorySet(resultAddress, result);
   },
-  add_constant: {
-    opcode: 9011,
-    description: `add the value at the 'a' address with the constant value 'b' and store
-the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a + b;
-      memorySet(resultAddress, result);
-    },
-  },
-  subtract: {
-    opcode: 9020,
-    description: `from the value at the 'a' address, subtract the value at the
+  addressingModes: [
+    {opcode: 1010, operandTypes: ['address', 'address', 'address']},
+    {opcode: 1011, operandTypes: ['address', 'constant', 'address']},
+    {opcode: 1012, operandTypes: ['address', 'adresss', 'pointer']},
+    {opcode: 1013, operandTypes: ['address', 'constant', 'pointer']},
+    {opcode: 1014, operandTypes: ['pointer', 'address', 'address']},
+    {opcode: 1015, operandTypes: ['pointer', 'constant', 'address']},
+    {opcode: 1016, operandTypes: ['pointer', 'constant', 'pointer']},
+    {opcode: 1017, operandTypes: ['pointer', 'pointer', 'pointer']},
+  ],
+};
+instructions['subtract'] = {
+  description: `from the value at the 'a' address, subtract the value at the
 'b' address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a - b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'value'], ['b', 'value'], ['result', 'address']],
+  execute(a, b, resultAddress) {
+    const result = a - b;
+    memorySet(resultAddress, result);
   },
-  subtract_constant: {
-    opcode: 9021,
-    description: `from the value at the 'a' address, subtract the constant value 'b' and
+  addressingModes: [
+    {opcode: 1020, operandTypes: ['address', 'address', 'address']},
+    {opcode: 1021, operandTypes: ['address', 'constant', 'address']},
+    {opcode: 1022, operandTypes: ['address', 'adresss', 'pointer']},
+    {opcode: 1023, operandTypes: ['address', 'constant', 'pointer']},
+    {opcode: 1024, operandTypes: ['pointer', 'address', 'address']},
+    {opcode: 1025, operandTypes: ['pointer', 'constant', 'address']},
+    {opcode: 1026, operandTypes: ['pointer', 'constant', 'pointer']},
+    {opcode: 1027, operandTypes: ['pointer', 'pointer', 'pointer']},
+  ],
+};
+instructions['subtract_constant'] = {
+  opcode: 9021,
+  description: `from the value at the 'a' address, subtract the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a - b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+  execute(aAddress, b, resultAddress) {
+    const a = memoryGet(aAddress);
+    const result = a - b;
+    memorySet(resultAddress, result);
   },
-  multiply: {
-    opcode: 9030,
-    description: `multiply the value at the 'a' address and the value at the 'b'
+};
+instructions['multiply'] = {
+  opcode: 9030,
+  description: `multiply the value at the 'a' address and the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a * b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+  execute(aAddress, bAddress, resultAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    const result = a * b;
+    memorySet(resultAddress, result);
   },
-  multiply_constant: {
-    opcode: 9031,
-    description: `multiply the value at the 'a' address and the constant value 'b' and
+};
+instructions['multiply_constant'] = {
+  opcode: 9031,
+  description: `multiply the value at the 'a' address and the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a * b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+  execute(aAddress, b, resultAddress) {
+    const a = memoryGet(aAddress);
+    const result = a * b;
+    memorySet(resultAddress, result);
   },
-  divide: {
-    opcode: 9040,
-    description: `integer divide the value at the 'a' address by the value at
+};
+instructions['divide'] = {
+  opcode: 9040,
+  description: `integer divide the value at the 'a' address by the value at
 the 'b' address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (b === 0) throw new Error('tried to divide by zero');
-      const result = Math.floor(a / b);
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+  execute(aAddress, bAddress, resultAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    if (b === 0) throw new Error('tried to divide by zero');
+    const result = Math.floor(a / b);
+    memorySet(resultAddress, result);
   },
-  divide_constant: {
-    opcode: 9041,
-    description: `integer divide the value at the 'a' address by the constant value 'b'
+};
+instructions['divide_constant'] = {
+  opcode: 9041,
+  description: `integer divide the value at the 'a' address by the constant value 'b'
 and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      if (b === 0) throw new Error('tried to divide by zero');
-      const result = Math.floor(a / b);
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+  execute(aAddress, b, resultAddress) {
+    const a = memoryGet(aAddress);
+    if (b === 0) throw new Error('tried to divide by zero');
+    const result = Math.floor(a / b);
+    memorySet(resultAddress, result);
   },
-  modulo: {
-    opcode: 9050,
-    description: `get the value at the 'a' address modulo the value at the 'b'
+};
+instructions['modulo'] = {
+  opcode: 9050,
+  description: `get the value at the 'a' address modulo the value at the 'b'
 address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (b === 0) throw new Error('tried to modulo by zero');
-      const result = a % b;
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+  execute(aAddress, bAddress, resultAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    if (b === 0) throw new Error('tried to modulo by zero');
+    const result = a % b;
+    memorySet(resultAddress, result);
   },
-  modulo_constant: {
-    opcode: 9051,
-    description: `get the value at the 'a' address modulo the constant value 'b' and
+};
+instructions['modulo_constant'] = {
+  opcode: 9051,
+  description: `get the value at the 'a' address modulo the constant value 'b' and
 store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a % b;
-      if (b === 0) throw new Error('tried to modulo by zero');
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+  execute(aAddress, b, resultAddress) {
+    const a = memoryGet(aAddress);
+    const result = a % b;
+    if (b === 0) throw new Error('tried to modulo by zero');
+    memorySet(resultAddress, result);
   },
-  compare: {
-    opcode: 9090,
-    description: `compare the value at the 'a' address and the value at the 'b'
+};
+instructions['compare'] = {
+  opcode: 9090,
+  description: `compare the value at the 'a' address and the value at the 'b'
 address and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      let result = 0;
-      if (a < b) {
-        result = -1;
-      } else if (a > b) {
-        result = 1;
-      }
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+  execute(aAddress, bAddress, resultAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    let result = 0;
+    if (a < b) {
+      result = -1;
+    } else if (a > b) {
+      result = 1;
+    }
+    memorySet(resultAddress, result);
   },
-  compare_constant: {
-    opcode: 9091,
-    description: `compare the value at the 'a' address and the constant value
+};
+instructions['compare_constant'] = {
+  opcode: 9091,
+  description: `compare the value at the 'a' address and the constant value
 'b' and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = bAddress;
-      let result = 0;
-      if (a < b) {
-        result = -1;
-      } else if (a > b) {
-        result = 1;
-      }
-      memorySet(resultAddress, result);
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+  execute(aAddress, bAddress, resultAddress) {
+    const a = memoryGet(aAddress);
+    const b = bAddress;
+    let result = 0;
+    if (a < b) {
+      result = -1;
+    } else if (a > b) {
+      result = 1;
+    }
+    memorySet(resultAddress, result);
   },
-  'jump_to':  {
-    opcode: 9100,
-    description: `set the program counter to the address of the label specified,
+};
+instructions['jump_to'] = {
+  opcode: 9100,
+  description: `set the program counter to the address of the label specified,
 so the program continues from there`,
-    operands: [['destination', 'label']],
-    execute(labelAddress) {
-      programCounter = labelAddress;
-    },
+  operands: [['destination', 'label']],
+  execute(labelAddress) {
+    programCounter = labelAddress;
   },
-  'branch_if_equal':  {
-    opcode: 9101,
-    description: `if the value at address 'a' is equal to the value at address
+};
+instructions['branch_if_equal'] = {
+  opcode: 9101,
+  description: `if the value at address 'a' is equal to the value at address
 'b', set the program counter to the address of the label specified, so the
 program continues from there`,
-    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
-    execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (a === b)  {
-        programCounter = labelAddress;
-      }
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
+  execute(aAddress, bAddress, labelAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    if (a === b)  {
+      programCounter = labelAddress;
+    }
   },
-  'branch_if_equal_constant':  {
-    opcode: 9102,
-    description: `if the value at address 'a' is equal to the constant value 'b', set the
+};
+instructions['branch_if_equal_constant'] = {
+  opcode: 9102,
+  description: `if the value at address 'a' is equal to the constant value 'b', set the
 program counter to the address of the label specified, so the program continues
 from there`,
-    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
-    execute(aAddress, b, labelAddress) {
-      const a = memoryGet(aAddress);
-      if (a === b)  {
-        programCounter = labelAddress;
-      }
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
+  execute(aAddress, b, labelAddress) {
+    const a = memoryGet(aAddress);
+    if (a === b)  {
+      programCounter = labelAddress;
+    }
   },
-  'branch_if_not_equal':  {
-    opcode: 9103,
-    description: `if the value at address 'a' is not equal to the value at
+};
+instructions['branch_if_not_equal'] = {
+  opcode: 9103,
+  description: `if the value at address 'a' is not equal to the value at
 address 'b', set the program counter to the address of the label specified, so
 the program continues from there`,
-    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
-    execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (a !== b)  {
-        programCounter = labelAddress;
-      }
-    },
+  operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
+  execute(aAddress, bAddress, labelAddress) {
+    const a = memoryGet(aAddress);
+    const b = memoryGet(bAddress);
+    if (a !== b)  {
+      programCounter = labelAddress;
+    }
   },
-  'branch_if_not_equal_constant':  {
-    opcode: 9104,
-    description: `if the value at address 'a' is not equal to the constant value 'b', set
+};
+instructions['branch_if_not_equal_constant'] = {
+  opcode: 9104,
+  description: `if the value at address 'a' is not equal to the constant value 'b', set
 the program counter to the address of the label specified, so the program
 continues from there`,
-    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
-    execute(aAddress, b, labelAddress) {
-      const a = memoryGet(aAddress);
-      if (a !== b)  {
-        programCounter = labelAddress;
-      }
-    },
+  operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
+  execute(aAddress, b, labelAddress) {
+    const a = memoryGet(aAddress);
+    if (a !== b)  {
+      programCounter = labelAddress;
+    }
   },
-  'data': {
-    opcode: 9200,
-    description: `operands given will be included in the program when it is
+};
+instructions['data'] = {
+  opcode: 9200,
+  description: `operands given will be included in the program when it is
 compiled at the position that they appear in the code, so you can use a label to
 get the address of the data and access it`,
-    operands: [],
-    execute() {
-    },
-  }, 
-  'break': {
-    opcode: 9998,
-    description: 'pause program execution, so it must be resumed via simulator UI',
-    operands: [],
-    execute() {
-      running = false;
-    },
+  operands: [],
+  execute() {
   },
-  'halt': {
-    opcode: 9999,
-    description: 'end program execution, requiring the simulator to be reset to start again',
-    operands: [],
-    execute() {
-      running = false;
-      halted = true;
-    },
+}; 
+instructions['break'] = {
+  opcode: 9998,
+  description: 'pause program execution, so it must be resumed via simulator UI',
+  operands: [],
+  execute() {
+    running = false;
+  },
+};
+instructions['halt'] = {
+  opcode: 9999,
+  description: 'end program execution, requiring the simulator to be reset to start again',
+  operands: [],
+  execute() {
+    running = false;
+    halted = true;
   },
 };
 
