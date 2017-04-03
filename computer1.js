@@ -475,6 +475,7 @@ const cpu = {
   */
   instructionsToOpcodes: new Map(),
   opcodesToInstructions: new Map(),
+
   /*
   Advances through the program by one instruction, getting input from the input
   devices (keyboard, mouse), executing the instruction, then writing output to the
@@ -495,17 +496,17 @@ const cpu = {
     );
     this.instructions[instructionName].execute.apply(null, operands);
   },
+
+  init() {
+    // Init mapping between our instruction names and opcodes
+    Object.keys(this.instructions).forEach((instructionName, index) => {
+      const opcode = this.instructions[instructionName].opcode;
+      this.instructionsToOpcodes.set(instructionName, opcode);
+      this.opcodesToInstructions.set(opcode, instructionName);
+    });
+  },
 };
-
-/*
-Init mapping between our instruction names and opcodes
-*/
-Object.keys(cpu.instructions).forEach((instructionName, index) => {
-  const opcode = cpu.instructions[instructionName].opcode;
-  cpu.instructionsToOpcodes.set(instructionName, opcode);
-  cpu.opcodesToInstructions.set(opcode, instructionName);
-});
-
+cpu.init();
 
 // 3.DISPLAY
 
@@ -931,7 +932,7 @@ let delayBetweenCycles = 0;
 const CYCLES_PER_YIELD = 997;
 function loop() {
   if (delayBetweenCycles === 0) {
-    // cpu.running full speed, execute a bunch of instructions before yielding
+    // running full speed, execute a bunch of instructions before yielding
     // to the JS event loop, to achieve decent 'real time' execution speed
     for (var i = 0; i < CYCLES_PER_YIELD; i++) {
       if (!cpu.running) {
