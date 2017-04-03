@@ -1,0 +1,11 @@
+{
+  "name": "little-virtual-computer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:jsdf/little-virtual-computer.git",
+  "author": "James Friend <james@kitefire.com>",
+  "license": "MIT",
+  "dependencies": {
+    "flow-bin": "^0.42.0"
+  }
+}
