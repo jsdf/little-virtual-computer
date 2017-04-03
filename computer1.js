@@ -7,7 +7,7 @@ Components: (do a ctrl-f find for them)
 2.CPU
 3.DISPLAY
 4.INPUT
-5.SOUND
+5.AUDIO
 6.ASSEMBLER
 7.SIMULATION CONTROL
 8.BUILT-IN PROGRAMS
@@ -646,84 +646,90 @@ const input = {
 };
 input.init();
 
-// 5.SOUND
+// 5.AUDIO
 
-const WAVETYPES = {
-  '0': 'square',
-  '1': 'sawtooth',
-  '2': 'triangle',
-  '3': 'sine',
+const audio = {
+  WAVETYPES: {
+    '0': 'square',
+    '1': 'sawtooth',
+    '2': 'triangle',
+    '3': 'sine',
+  },
+
+  MAX_GAIN: 0.15,
+
+  audioCtx: new AudioContext(),
+
+  audioChannels: [],
+
+  addAudioChannel(wavetypeAddr, freqAddr, volAddr) {
+    const oscillatorNode = this.audioCtx.createOscillator();
+    const gainNode = this.audioCtx.createGain();
+    oscillatorNode.connect(gainNode);
+    gainNode.connect(this.audioCtx.destination);
+
+    const state = {
+      gain: 0,
+      oscillatorType: 'square',
+      frequency: 440,
+    };
+
+    gainNode.gain.value = state.gain;
+    oscillatorNode.type = state.oscillatorType;
+    oscillatorNode.frequency.value = state.frequency;
+    oscillatorNode.start();
+
+    return this.audioChannels.push({
+      state,
+      wavetypeAddr,
+      freqAddr,
+      volAddr,
+      gainNode,
+      oscillatorNode,
+    });
+  },
+
+  updateAudio() {
+    this.audioChannels.forEach(channel => {
+      const frequency = (memory.ram[channel.freqAddr] || 0) / 1000;
+      const gain = !cpu.running ? 0 : (memory.ram[channel.volAddr] || 0) / 100 * this.MAX_GAIN;
+      const oscillatorType = this.WAVETYPES[memory.ram[channel.wavetypeAddr] || 0];
+
+      const {state} = channel;
+      if (state.gain !== gain) {
+        channel.gainNode.gain.setValueAtTime(gain, this.audioCtx.currentTime);
+        state.gain = gain;
+      }
+      if (state.oscillatorType !== oscillatorType) {
+        channel.oscillatorNode.type = oscillatorType;
+        state.oscillatorType = oscillatorType;
+      }
+      if (state.frequency !== frequency) {
+        channel.oscillatorNode.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
+        state.frequency = frequency;
+      }
+    });
+  },
+
+  init() {
+    this.addAudioChannel(
+      memory.AUDIO_CH1_WAVETYPE_ADDRESS,
+      memory.AUDIO_CH1_FREQUENCY_ADDRESS,
+      memory.AUDIO_CH1_VOLUME_ADDRESS
+    );
+    this.addAudioChannel(
+      memory.AUDIO_CH2_WAVETYPE_ADDRESS,
+      memory.AUDIO_CH2_FREQUENCY_ADDRESS,
+      memory.AUDIO_CH2_VOLUME_ADDRESS
+    );
+    this.addAudioChannel(
+      memory.AUDIO_CH3_WAVETYPE_ADDRESS,
+      memory.AUDIO_CH3_FREQUENCY_ADDRESS,
+      memory.AUDIO_CH3_VOLUME_ADDRESS
+    );
+  },
 };
-
-const MAX_GAIN = 0.15;
-const audioCtx = new AudioContext();
-
-function makeAudioChannel(wavetypeAddr, freqAddr, volAddr) {
-  const oscillatorNode = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-  oscillatorNode.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-
-  const state = {
-    gain: 0,
-    oscillatorType: 'square',
-    frequency: 440,
-  };
-
-  gainNode.gain.value = state.gain;
-  oscillatorNode.type = state.oscillatorType;
-  oscillatorNode.frequency.value = state.frequency;
-  oscillatorNode.start();
-
-  return {
-    state,
-    wavetypeAddr,
-    freqAddr,
-    volAddr,
-    gainNode,
-    oscillatorNode,
-  };
-}
-
-const audioChannels = [
-  makeAudioChannel(
-    memory.AUDIO_CH1_WAVETYPE_ADDRESS,
-    memory.AUDIO_CH1_FREQUENCY_ADDRESS,
-    memory.AUDIO_CH1_VOLUME_ADDRESS
-  ),
-  makeAudioChannel(
-    memory.AUDIO_CH2_WAVETYPE_ADDRESS,
-    memory.AUDIO_CH2_FREQUENCY_ADDRESS,
-    memory.AUDIO_CH2_VOLUME_ADDRESS
-  ),
-  makeAudioChannel(
-    memory.AUDIO_CH3_WAVETYPE_ADDRESS,
-    memory.AUDIO_CH3_FREQUENCY_ADDRESS,
-    memory.AUDIO_CH3_VOLUME_ADDRESS
-  ),
-];
-
-function updateAudio() {
-  audioChannels.forEach(channel => {
-    const frequency = (memory.ram[channel.freqAddr] || 0) / 1000;
-    const gain = !cpu.running ? 0 : (memory.ram[channel.volAddr] || 0) / 100 * MAX_GAIN;
-    const oscillatorType = WAVETYPES[memory.ram[channel.wavetypeAddr] || 0];
-
-    const {state} = channel;
-    if (state.gain !== gain) {
-      channel.gainNode.gain.setValueAtTime(gain, audioCtx.currentTime);
-      state.gain = gain;
-    }
-    if (state.oscillatorType !== oscillatorType) {
-      channel.oscillatorNode.type = oscillatorType;
-      state.oscillatorType = oscillatorType;
-    }
-    if (state.frequency !== frequency) {
-      channel.oscillatorNode.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-      state.frequency = frequency;
-    }
-  });
-}
+audio.init();
 
 // 6.ASSEMBLER
 
@@ -997,7 +1003,7 @@ function loadProgramAndReset() {
 
 function updateOutputs() {
   display.drawScreen();
-  updateAudio();
+  audio.updateAudio();
 }
 
 // 8.BUILT-IN PROGRAMS
