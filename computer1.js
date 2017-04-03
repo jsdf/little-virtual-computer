@@ -506,7 +506,6 @@ const cpu = {
     });
   },
 };
-cpu.init();
 
 // 3.DISPLAY
 
@@ -558,6 +557,9 @@ const display = {
     return color;
   },
 
+  imageData: null,
+  canvasCtx: null,
+
   /*
   Read the pixel values from video memory, look them up in our color palette, and
   convert them to the format which the Canvas 2D API requires: an array of RGBA
@@ -568,8 +570,9 @@ const display = {
   (full opacity) for every pixel.
   */
   drawScreen() {
+    const imageData = this.getImageData();
     const videoMemoryLength = memory.VIDEO_MEMORY_END - memory.VIDEO_MEMORY_START;
-    const pixelsRGBA = displayImageData.data;
+    const pixelsRGBA = imageData.data;
     for (var i = 0; i < videoMemoryLength; i++) {
       const pixelColorId = memory.ram[memory.VIDEO_MEMORY_START + i];
       const colorRGB = this.getColor(pixelColorId || 0, memory.VIDEO_MEMORY_START + i);
@@ -579,14 +582,25 @@ const display = {
       pixelsRGBA[i * 4 + 3] = 255; // full opacity
     }
 
-    if (displayCanvasCtx == null) throw new Error('expected canvas context');
-    displayCanvasCtx.putImageData(displayImageData, 0, 0);
+    const canvasCtx = this.getCanvasContext();
+    canvasCtx.putImageData(imageData, 0, 0);
+  },
+
+  getImageData() /*: ImageData */ {
+    return (this.imageData/*: any */);
+  },
+
+  getCanvasContext() /*: CanvasRenderingContext2D */ {
+    return (this.canvasCtx/*: any */);
+  },
+
+  init() {
+    const canvasCtx = notNull(SimulatorUI.getCanvas().getContext('2d'));
+    const imageData = canvasCtx.createImageData(display.SCREEN_WIDTH, display.SCREEN_HEIGHT);
+    this.imageData = (imageData/*: any */);
+    this.canvasCtx = (canvasCtx/*: any */);
   },
 };
-
-const displayCanvasCtx = getCanvas().getContext('2d');
-if (displayCanvasCtx == null) throw new Error('expected canvas context');
-const displayImageData = displayCanvasCtx.createImageData(display.SCREEN_WIDTH, display.SCREEN_HEIGHT);
 
 // 4.INPUT
 
@@ -622,9 +636,9 @@ const input = {
       this.mouseDown = false;
     };
 
-    const screenPageTop = getCanvas().getBoundingClientRect().top + window.scrollY;
-    const screenPageLeft = getCanvas().getBoundingClientRect().left + window.scrollX;
-    getCanvas().onmousemove = (event) => {
+    const screenPageTop = SimulatorUI.getCanvas().getBoundingClientRect().top + window.scrollY;
+    const screenPageLeft = SimulatorUI.getCanvas().getBoundingClientRect().left + window.scrollX;
+    SimulatorUI.getCanvas().onmousemove = (event) => {
       this.mouseX = Math.floor((event.pageX - screenPageTop) / display.SCREEN_PIXEL_SCALE);
       this.mouseY = Math.floor((event.pageY - screenPageLeft) / display.SCREEN_PIXEL_SCALE);
     };
@@ -644,7 +658,6 @@ const input = {
     memory.ram[memory.CURRENT_TIME_ADDRESS] = Date.now();
   },
 };
-input.init();
 
 // 5.AUDIO
 
@@ -729,7 +742,6 @@ const audio = {
     );
   },
 };
-audio.init();
 
 // 6.ASSEMBLER
 
@@ -924,7 +936,6 @@ const assembler = {
     this.initInstructionsLabelOperands();
   }
 };
-assembler.init();
 
 // 7.SIMULATION CONTROL
 
@@ -934,12 +945,12 @@ const simulation = {
   delayBetweenCycles: 0,
 
   loop() {
-    if (this.delayBetweenCycles === 0) {
+    if (simulation.delayBetweenCycles === 0) {
       // running full speed, execute a bunch of instructions before yielding
       // to the JS event loop, to achieve decent 'real time' execution speed
-      for (var i = 0; i < this.CYCLES_PER_YIELD; i++) {
+      for (var i = 0; i < simulation.CYCLES_PER_YIELD; i++) {
         if (!cpu.running) {
-          this.stop();
+          simulation.stop();
           break;
         }
         cpu.step();
@@ -948,25 +959,25 @@ const simulation = {
       // run only one execution before yielding to the JS event loop so screen
       // and UI changes can be shown, and new mouse and keyboard input taken
       cpu.step();
-      updateUI();
+      SimulatorUI.updateUI();
     }
-    this.updateOutputs();
+    simulation.updateOutputs();
     if (cpu.running) {
-      setTimeout(this.loop, this.delayBetweenCycles);
+      setTimeout(simulation.loop, simulation.delayBetweenCycles);
     }
   },
 
   run() {
     cpu.running = true;
-    updateUI();
-    updateSpeedUI();
+    SimulatorUI.updateUI();
+    SimulatorUI.updateSpeedUI();
     this.loop();
   },
 
   stop() {
     cpu.running = false;
-    updateUI();
-    updateSpeedUI();
+    SimulatorUI.updateUI();
+    SimulatorUI.updateSpeedUI();
   },
 
   updateOutputs() {
@@ -987,20 +998,20 @@ const simulation = {
       memory.ram[i] = 0;
     }
 
-    const programText = getProgramText();
+    const programText = SimulatorUI.getProgramText();
     try {
       assembler.assembleAndLoadProgram(assembler.parseProgramText(programText));
     } catch (err) {
       alert(err.stack);
       console.error(err.stack)
     }
-    setLoadedProgramText(programText);
+    SimulatorUI.setLoadedProgramText(programText);
 
     cpu.reset();
     this.updateOutputs();
-    updateProgramMemoryView();
-    updateUI();
-    updateSpeedUI();
+    SimulatorUI.updateProgramMemoryView();
+    SimulatorUI.updateUI();
+    SimulatorUI.updateSpeedUI();
   },
 
   stepOnce() {
@@ -1008,7 +1019,7 @@ const simulation = {
     cpu.step();
     cpu.running = false;
     this.updateOutputs();
-    updateUI();
+    SimulatorUI.updateUI();
   },
 
   runStop() {
@@ -1405,264 +1416,267 @@ data -1
 
 // boring code for rendering user interface of the simulator
 // not really important for understanding how computers work
+const UI = {
+  $(selector) {
+    const el = document.querySelector(selector);
+    if (el == null) throw new Error(`couldn't find selector '${selector}'`);
+    return el;
+  },
 
-function $(selector) {
-  const el = document.querySelector(selector);
-  if (el == null) throw new Error(`couldn't find selector '${selector}'`);
-  return el;
-}
+  $Input(selector) {
+    const el = UI.$(selector);
+    if (el instanceof HTMLInputElement) return el;
+    throw new Error('expected HTMLInputElement');
+  },
+  $TextArea(selector) {
+    const el = UI.$(selector);
+    if (el instanceof HTMLTextAreaElement) return el;
+    throw new Error('expected HTMLTextAreaElement');
+  },
+  $Button(selector) {
+    const el = UI.$(selector);
+    if (el instanceof HTMLButtonElement) return el;
+    throw new Error('expected HTMLButtonElement');
+  },
+  $Canvas(selector) {
+    const el = UI.$(selector);
+    if (el instanceof HTMLCanvasElement) return el;
+    throw new Error('expected HTMLCanvasElement');
+  },
+  $Select(selector) {
+    const el = UI.$(selector);
+    if (el instanceof HTMLSelectElement) return el;
+    throw new Error('expected HTMLSelectElement');
+  },
 
-function $Input(selector) {
-  const el = $(selector);
-  if (el instanceof HTMLInputElement) return el;
-  throw new Error('expected HTMLInputElement');
-}
-function $TextArea(selector) {
-  const el = $(selector);
-  if (el instanceof HTMLTextAreaElement) return el;
-  throw new Error('expected HTMLTextAreaElement');
-}
-function $Button(selector) {
-  const el = $(selector);
-  if (el instanceof HTMLButtonElement) return el;
-  throw new Error('expected HTMLButtonElement');
-}
-function $Canvas(selector) {
-  const el = $(selector);
-  if (el instanceof HTMLCanvasElement) return el;
-  throw new Error('expected HTMLCanvasElement');
-}
-function $Select(selector) {
-  const el = $(selector);
-  if (el instanceof HTMLSelectElement) return el;
-  throw new Error('expected HTMLSelectElement');
-}
+  virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
+    Object.assign(container.style, {
+      height: `${containerHeight}px`,
+      overflow: 'auto',
+    });
+    const content = document.createElement('div');
+    Object.assign(content.style, {
+      height: `${itemHeight * numItems}px`,
+      overflow: 'hidden',
+    });
+    container.appendChild(content);
 
-let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels';
+    const rows = document.createElement('div');
+    content.appendChild(rows);
 
-function initUI() {
-  const programSelectorEl = $Select('#programSelector');
-  // init program selector
-  Object.keys(PROGRAMS).forEach(programName => {
-    const option = document.createElement('option');
-    option.value = programName;
-    option.textContent = programName;
-    programSelectorEl.append(option);
-  });
-  programSelectorEl.value = selectedProgram;
-  selectProgram();
-}
+    const overscan = 10; // how many rows above/below viewport to render
 
-function getProgramText() {
-  return $TextArea('#program').value;
-}
+    const renderRowsInView = () => requestAnimationFrame(() => {
+      const start = Math.max(0, Math.floor(container.scrollTop / itemHeight) - overscan);
+      const end = Math.min(numItems, Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan);
+      const offsetTop = start * itemHeight;
 
-function getCanvas() {
-  return $Canvas('#canvasEl');
-}
+      rows.style.transform = `translateY(${offsetTop}px)`;
+      rows.innerHTML = renderItems(start, end);
+    });
 
-function initScreen(width, height, pixelScale) {
-  let imageRendering = 'pixelated';
-  if (/firefox/i.test(navigator.userAgent)) {
-    imageRendering = '-moz-crisp-edges';
+    container.onscroll = renderRowsInView;
+
+    return renderRowsInView;
   }
-  Object.assign(getCanvas(), {width, height});
-  // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
-  // $FlowFixMe: ignore unknown property '-ms-interpolation-mode'
-  Object.assign(getCanvas().style, {
-    transformOrigin: 'top left',
-    transform: `scale(${pixelScale})`,
-    '-ms-interpolation-mode': 'nearest-neighbor',
-    imageRendering,
-  });
-}
+};
 
-let loadedProgramText = null;
-function setLoadedProgramText(programText) {
-  loadedProgramText = programText;
-  $Button('#loadProgramButton').disabled = true;
-}
+const SimulatorUI = {
+  selectedProgram: localStorage.getItem('selectedProgram') || 'RandomPixels',
 
-function updateLoadProgramButton() {
-  $Button('#loadProgramButton').disabled = loadedProgramText === getProgramText();
-}
+  initUI() {
+    const programSelectorEl = UI.$Select('#programSelector');
+    // init program selector
+    Object.keys(PROGRAMS).forEach(programName => {
+      const option = document.createElement('option');
+      option.value = programName;
+      option.textContent = programName;
+      programSelectorEl.append(option);
+    });
+    programSelectorEl.value = this.selectedProgram;
+    this.selectProgram();
+  },
 
-function selectProgram() {
-  selectedProgram = $Select('#programSelector').value;
-  localStorage.setItem('selectedProgram', selectedProgram);
-  $TextArea('#program').value =
-    localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram] || '';
-  updateLoadProgramButton();
-}
+  getProgramText() {
+    return UI.$TextArea('#program').value;
+  },
 
-function editProgramText() {
-  if (selectedProgram.startsWith('Custom')) {
-    localStorage.setItem(selectedProgram, $TextArea('#program').value);
-  }
-  updateLoadProgramButton();
-}
+  getCanvas() {
+    return UI.$Canvas('#canvas');
+  },
 
-function setSpeed() {
-  simulation.delayBetweenCycles = -parseInt($Input('#speed').value, 10);
-  updateSpeedUI();
-}
-
-function setFullspeed() {
-  const fullspeedEl = $Input('#fullspeed');
-  if (fullspeedEl && fullspeedEl.checked) {
-    simulation.delayBetweenCycles = 0;
-  } else {
-    simulation.delayBetweenCycles = 1;
-  }
-  updateSpeedUI();
-}
-
-function updateSpeedUI() {
-  const fullspeed = simulation.delayBetweenCycles === 0;
-  const runningAtFullspeed = cpu.running && fullspeed;
-  $Input('#fullspeed').checked = fullspeed;
-  $Input('#speed').value = String(-simulation.delayBetweenCycles);
-  $('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
-  $('#debuggerMessageArea').textContent = runningAtFullspeed ?
-    'debug UI disabled when cpu.running at full speed' : '';
-}
-
-function updateUI() {
-  $Input('#programCounter').value = String(cpu.programCounter);
-  if (cpu.halted) {
-    $('#running').textContent = 'halted';
-    $Button('#stepButton').disabled = true;
-    $Button('#runButton').disabled = true;
-  } else {
-    $('#running').textContent = cpu.running ? 'running' : 'paused';
-    $Button('#stepButton').disabled = false;
-    $Button('#runButton').disabled = false;
-  }
-  updateWorkingMemoryView();
-  updateInputMemoryView();
-  updateVideoMemoryView();
-  updateAudioMemoryView();
-  if (simulation.delayBetweenCycles > 300 || !cpu.running) {
-    if (typeof scrollToProgramLine == 'function') {
-      scrollToProgramLine(Math.max(0, cpu.programCounter - memory.PROGRAM_MEMORY_START - 3));
+  initScreen(width, height, pixelScale) {
+    let imageRendering = 'pixelated';
+    if (/firefox/i.test(navigator.userAgent)) {
+      imageRendering = '-moz-crisp-edges';
     }
-  }
-}
+    Object.assign(SimulatorUI.getCanvas(), {width, height});
+    // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
+    // $FlowFixMe: ignore unknown property '-ms-interpolation-mode'
+    Object.assign(SimulatorUI.getCanvas().style, {
+      transformOrigin: 'top left',
+      transform: `scale(${pixelScale})`,
+      '-ms-interpolation-mode': 'nearest-neighbor',
+      imageRendering,
+    });
+  },
 
-function updateWorkingMemoryView() {
-  const lines = [];
-  for (var i = memory.WORKING_MEMORY_START; i < memory.WORKING_MEMORY_END; i++) {
-    lines.push(`${i}: ${memory[i]}`);
-  }
-  $TextArea('#workingMemoryView').textContent = lines.join('\n');
-}
+  loadedProgramText: '',
+  setLoadedProgramText(programText) {
+    this.loadedProgramText = programText;
+    UI.$Button('#loadProgramButton').disabled = true;
+  },
 
-let scrollToProgramLine = null
-function updateProgramMemoryView() {
-  const lines = [];
-  for (var i = memory.PROGRAM_MEMORY_START; i < memory.PROGRAM_MEMORY_END; i++) {
-    const instruction = cpu.opcodesToInstructions.get(memory[i]);
-    lines.push(`${padRight(i, 4)}: ${padRight(memory[i], 8)} ${instruction || ''}`);
-    if (instruction) {
-      const operands = cpu.instructions[instruction].operands;
-      for (var j = 0; j < operands.length; j++) {
-        lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
+  updateLoadProgramButton() {
+    UI.$Button('#loadProgramButton').disabled = this.loadedProgramText === this.getProgramText();
+  },
+
+  selectProgram() {
+    this.selectedProgram = UI.$Select('#programSelector').value;
+    localStorage.setItem('selectedProgram', this.selectedProgram);
+    UI.$TextArea('#program').value =
+      localStorage.getItem(this.selectedProgram) || PROGRAMS[this.selectedProgram] || '';
+    this.updateLoadProgramButton();
+  },
+
+  editProgramText() {
+    if (this.selectedProgram.startsWith('Custom')) {
+      localStorage.setItem(this.selectedProgram, UI.$TextArea('#program').value);
+    }
+    this.updateLoadProgramButton();
+  },
+
+  setSpeed() {
+    simulation.delayBetweenCycles = -parseInt(UI.$Input('#speed').value, 10);
+    this.updateSpeedUI();
+  },
+
+  setFullspeed() {
+    const fullspeedEl = UI.$Input('#fullspeed');
+    if (fullspeedEl && fullspeedEl.checked) {
+      simulation.delayBetweenCycles = 0;
+    } else {
+      simulation.delayBetweenCycles = 1;
+    }
+    this.updateSpeedUI();
+  },
+
+  updateSpeedUI() {
+    const fullspeed = simulation.delayBetweenCycles === 0;
+    const runningAtFullspeed = cpu.running && fullspeed;
+    UI.$Input('#fullspeed').checked = fullspeed;
+    UI.$Input('#speed').value = String(-simulation.delayBetweenCycles);
+    UI.$('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
+    UI.$('#debuggerMessageArea').textContent = runningAtFullspeed ?
+      'debug UI disabled when cpu.running at full speed' : '';
+  },
+
+  updateUI() {
+    UI.$Input('#programCounter').value = String(cpu.programCounter);
+    if (cpu.halted) {
+      UI.$('#running').textContent = 'halted';
+      UI.$Button('#stepButton').disabled = true;
+      UI.$Button('#runButton').disabled = true;
+    } else {
+      UI.$('#running').textContent = cpu.running ? 'running' : 'paused';
+      UI.$Button('#stepButton').disabled = false;
+      UI.$Button('#runButton').disabled = false;
+    }
+    this.updateWorkingMemoryView();
+    this.updateInputMemoryView();
+    this.updateVideoMemoryView();
+    this.updateAudioMemoryView();
+    if (simulation.delayBetweenCycles > 300 || !cpu.running) {
+      if (typeof this.scrollToProgramLine == 'function') {
+        this.scrollToProgramLine(Math.max(0, cpu.programCounter - memory.PROGRAM_MEMORY_START - 3));
       }
-      i += operands.length;
     }
-  }
-  
-  const itemHeight = 14;
-  const renderProgramMemoryView = virtualizedScrollView(
-    $('#programMemoryView'),
-    136,
-    itemHeight,
-    lines.length,
-    (start, end) => (
-      lines.slice(start, end)
-        .map((l, i) => {
-          const current = memory.PROGRAM_MEMORY_START + start + i === cpu.programCounter;
-          return `
-<pre
-  class="tablerow"
-  style="height: ${itemHeight}px; background: ${current ? '#eee' : 'none'}"
->${l}</pre>
-          `;
-        })
-        .join('')
-    )
-  );
+  },
 
-  scrollToProgramLine = (item) => {
-    $('#programMemoryView').scrollTop = item * itemHeight;
-    renderProgramMemoryView(); 
-  };
+  updateWorkingMemoryView() {
+    const lines = [];
+    for (var i = memory.WORKING_MEMORY_START; i < memory.WORKING_MEMORY_END; i++) {
+      lines.push(`${i}: ${memory[i]}`);
+    }
+    UI.$TextArea('#workingMemoryView').textContent = lines.join('\n');
+  },
 
-  renderProgramMemoryView();
-}
+  scrollToProgramLine: (item) => {},
+  updateProgramMemoryView() {
+    const lines = [];
+    for (var i = memory.PROGRAM_MEMORY_START; i < memory.PROGRAM_MEMORY_END; i++) {
+      const instruction = cpu.opcodesToInstructions.get(memory[i]);
+      lines.push(`${padRight(i, 4)}: ${padRight(memory[i], 8)} ${instruction || ''}`);
+      if (instruction) {
+        const operands = cpu.instructions[instruction].operands;
+        for (var j = 0; j < operands.length; j++) {
+          lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
+        }
+        i += operands.length;
+      }
+    }
+    
+    const itemHeight = 14;
+    const renderProgramMemoryView = UI.virtualizedScrollView(
+      UI.$('#programMemoryView'),
+      136,
+      itemHeight,
+      lines.length,
+      (start, end) => (
+        lines.slice(start, end)
+          .map((l, i) => {
+            const current = memory.PROGRAM_MEMORY_START + start + i === cpu.programCounter;
+            return `
+  <pre
+    class="tablerow"
+    style="height: ${itemHeight}px; background: ${current ? '#eee' : 'none'}"
+  >${l}</pre>
+            `;
+          })
+          .join('')
+      )
+    );
 
-function updateInputMemoryView() {
-  $TextArea('#inputMemoryView').textContent =
-    `${memory.KEYCODE_0_ADDRESS}: ${padRight(memory[memory.KEYCODE_0_ADDRESS], 8)} keycode 0
-${memory.KEYCODE_1_ADDRESS}: ${padRight(memory[memory.KEYCODE_1_ADDRESS], 8)} keycode 1
-${memory.KEYCODE_2_ADDRESS}: ${padRight(memory[memory.KEYCODE_2_ADDRESS], 8)} keycode 2
-${memory.MOUSE_X_ADDRESS}: ${padRight(memory[memory.MOUSE_X_ADDRESS], 8)} mouse x
-${memory.MOUSE_Y_ADDRESS}: ${padRight(memory[memory.MOUSE_Y_ADDRESS], 8)} mouse y
-${memory.MOUSE_PIXEL_ADDRESS}: ${padRight(memory[memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
-${memory.MOUSE_BUTTON_ADDRESS}: ${padRight(memory[memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
-${memory.RANDOM_NUMBER_ADDRESS}: ${padRight(memory[memory.RANDOM_NUMBER_ADDRESS], 8)} random number`;
-}
+    this.scrollToProgramLine = (item) => {
+      UI.$('#programMemoryView').scrollTop = item * itemHeight;
+      renderProgramMemoryView(); 
+    };
 
-function updateVideoMemoryView() {
-  const lines = [];
-  for (var i = memory.VIDEO_MEMORY_START; i < memory.VIDEO_MEMORY_END; i++) {
-    lines.push(`${i}: ${memory[i]}`);
-  }
-  $TextArea('#videoMemoryView').textContent = lines.join('\n');
-}
+    renderProgramMemoryView();
+  },
 
-function updateAudioMemoryView() {
-  $TextArea('#audioMemoryView').textContent =
-`${memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
-${memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
-${memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
-${memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
-${memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
-${memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
-${memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
-${memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
-${memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
-}
+  updateInputMemoryView() {
+    UI.$TextArea('#inputMemoryView').textContent =
+      `${memory.KEYCODE_0_ADDRESS}: ${padRight(memory[memory.KEYCODE_0_ADDRESS], 8)} keycode 0
+  ${memory.KEYCODE_1_ADDRESS}: ${padRight(memory[memory.KEYCODE_1_ADDRESS], 8)} keycode 1
+  ${memory.KEYCODE_2_ADDRESS}: ${padRight(memory[memory.KEYCODE_2_ADDRESS], 8)} keycode 2
+  ${memory.MOUSE_X_ADDRESS}: ${padRight(memory[memory.MOUSE_X_ADDRESS], 8)} mouse x
+  ${memory.MOUSE_Y_ADDRESS}: ${padRight(memory[memory.MOUSE_Y_ADDRESS], 8)} mouse y
+  ${memory.MOUSE_PIXEL_ADDRESS}: ${padRight(memory[memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
+  ${memory.MOUSE_BUTTON_ADDRESS}: ${padRight(memory[memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
+  ${memory.RANDOM_NUMBER_ADDRESS}: ${padRight(memory[memory.RANDOM_NUMBER_ADDRESS], 8)} random number`;
+  },
 
-function virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
-  Object.assign(container.style, {
-    height: `${containerHeight}px`,
-    overflow: 'auto',
-  });
-  const content = document.createElement('div');
-  Object.assign(content.style, {
-    height: `${itemHeight * numItems}px`,
-    overflow: 'hidden',
-  });
-  container.appendChild(content);
+  updateVideoMemoryView() {
+    const lines = [];
+    for (var i = memory.VIDEO_MEMORY_START; i < memory.VIDEO_MEMORY_END; i++) {
+      lines.push(`${i}: ${memory[i]}`);
+    }
+    UI.$TextArea('#videoMemoryView').textContent = lines.join('\n');
+  },
 
-  const rows = document.createElement('div');
-  content.appendChild(rows);
-
-  const overscan = 10; // how many rows above/below viewport to render
-
-  const renderRowsInView = () => requestAnimationFrame(() => {
-    const start = Math.max(0, Math.floor(container.scrollTop / itemHeight) - overscan);
-    const end = Math.min(numItems, Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan);
-    const offsetTop = start * itemHeight;
-
-    rows.style.transform = `translateY(${offsetTop}px)`;
-    rows.innerHTML = renderItems(start, end);
-  });
-
-  container.onscroll = renderRowsInView;
-
-  return renderRowsInView;
+  updateAudioMemoryView() {
+    UI.$TextArea('#audioMemoryView').textContent =
+  `${memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
+  ${memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
+  ${memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
+  ${memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
+  ${memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
+  ${memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
+  ${memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
+  ${memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
+  ${memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
+  },
 }
 
 function clamp(val, min, max) {
@@ -1678,6 +1692,16 @@ function padRight(input, length) {
   return padded;
 }
 
-initScreen(display.SCREEN_WIDTH, display.SCREEN_HEIGHT, display.SCREEN_PIXEL_SCALE);
-initUI();
+function notNull(val) {
+  if (val != null) return val;
+  throw new Error('unexpected null');
+}
+
+cpu.init();
+display.init();
+input.init();
+audio.init();
+assembler.init();
+SimulatorUI.initScreen(display.SCREEN_WIDTH, display.SCREEN_HEIGHT, display.SCREEN_PIXEL_SCALE);
+SimulatorUI.initUI();
 simulation.loadProgramAndReset();
