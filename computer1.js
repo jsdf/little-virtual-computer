@@ -482,7 +482,7 @@ const cpu = {
   output devices (screen, audio).
   */
   step() {
-    updateInputs();
+    input.updateInputs();
     const opcode = this.advanceProgramCounter();
     const instructionName = this.opcodesToInstructions.get(opcode);
     if (!instructionName) {
@@ -590,48 +590,61 @@ const displayImageData = displayCanvasCtx.createImageData(display.SCREEN_WIDTH, 
 
 // 4.INPUT
 
-const keysPressed = new Set();
+/*
+We make mouse and keyboard input available to our simulated computer by setting
+certain locations in memory the current keyboard and mouse states before each
+CPU operation.
 
-if (!document.body) throw new Error('not ready');
+Because the browser provides an event-based API for input, we need to listen for
+relevent keyboard and mouse events and keep track of their state and expose it
+to the simulated computer.
+*/
+const input = {
+  keysPressed: new Set(),
+  mouseDown: false,
+  mouseX: 0,
+  mouseY: 0,
 
-document.body.onkeydown = function(event) {
-  keysPressed.add(event.which);
-}
-document.body.onkeyup = function(event) {
-  keysPressed.delete(event.which);
-}
+  init() {
+    if (!document.body) throw new Error('DOM not ready');
 
-let mouseDown = false;
-document.body.onmousedown = function() { 
-  mouseDown = true;
-}
-document.body.onmouseup = function() {
-  mouseDown = false;
-}
+    document.body.onkeydown = (event) => {
+      this.keysPressed.add(event.which);
+    };
+    document.body.onkeyup = (event) => {
+      this.keysPressed.delete(event.which);
+    };
 
-let mouseX = 0;
-let mouseY = 0;
+    document.body.onmousedown = () => { 
+      this.mouseDown = true;
+    };
+    document.body.onmouseup = () => {
+      this.mouseDown = false;
+    };
 
-const screenPageTop = getCanvas().getBoundingClientRect().top + window.scrollY;
-const screenPageLeft = getCanvas().getBoundingClientRect().left + window.scrollX;
-getCanvas().onmousemove = function(event) {
-  mouseX = Math.floor((event.pageX - screenPageTop) / display.SCREEN_PIXEL_SCALE);
-  mouseY = Math.floor((event.pageY - screenPageLeft) / display.SCREEN_PIXEL_SCALE);
-}
+    const screenPageTop = getCanvas().getBoundingClientRect().top + window.scrollY;
+    const screenPageLeft = getCanvas().getBoundingClientRect().left + window.scrollX;
+    getCanvas().onmousemove = (event) => {
+      this.mouseX = Math.floor((event.pageX - screenPageTop) / display.SCREEN_PIXEL_SCALE);
+      this.mouseY = Math.floor((event.pageY - screenPageLeft) / display.SCREEN_PIXEL_SCALE);
+    };
+  },
 
-function updateInputs() {
-  const mostRecentKeys = Array.from(keysPressed.values()).reverse();
+  updateInputs() {
+    const mostRecentKeys = Array.from(this.keysPressed.values()).reverse();
 
-  memory.ram[memory.KEYCODE_0_ADDRESS] = mostRecentKeys[0] || 0;
-  memory.ram[memory.KEYCODE_1_ADDRESS] = mostRecentKeys[1] || 0;
-  memory.ram[memory.KEYCODE_2_ADDRESS] = mostRecentKeys[2] || 0;
-  memory.ram[memory.MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
-  memory.ram[memory.MOUSE_X_ADDRESS] = mouseX;
-  memory.ram[memory.MOUSE_Y_ADDRESS] = mouseY;
-  memory.ram[memory.MOUSE_PIXEL_ADDRESS] = memory.VIDEO_MEMORY_START + (Math.floor(mouseY)) * display.SCREEN_WIDTH + Math.floor(mouseX);
-  memory.ram[memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
-  memory.ram[memory.CURRENT_TIME_ADDRESS] = Date.now();
-}
+    memory.ram[memory.KEYCODE_0_ADDRESS] = mostRecentKeys[0] || 0;
+    memory.ram[memory.KEYCODE_1_ADDRESS] = mostRecentKeys[1] || 0;
+    memory.ram[memory.KEYCODE_2_ADDRESS] = mostRecentKeys[2] || 0;
+    memory.ram[memory.MOUSE_BUTTON_ADDRESS] = this.mouseDown ? 1 : 0;
+    memory.ram[memory.MOUSE_X_ADDRESS] = this.mouseX;
+    memory.ram[memory.MOUSE_Y_ADDRESS] = this.mouseY;
+    memory.ram[memory.MOUSE_PIXEL_ADDRESS] = memory.VIDEO_MEMORY_START + (Math.floor(this.mouseY)) * display.SCREEN_WIDTH + Math.floor(this.mouseX);
+    memory.ram[memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
+    memory.ram[memory.CURRENT_TIME_ADDRESS] = Date.now();
+  },
+};
+input.init();
 
 // 5.SOUND
 
