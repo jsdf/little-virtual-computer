@@ -509,80 +509,83 @@ Object.keys(cpu.instructions).forEach((instructionName, index) => {
 
 // 3.DISPLAY
 
-const SCREEN_WIDTH = 30;
-const SCREEN_HEIGHT = 30;
-const SCREEN_PIXEL_SCALE = 20;
+const display = {
+  SCREEN_WIDTH: 30,
+  SCREEN_HEIGHT: 30,
+  SCREEN_PIXEL_SCALE: 20,
 
-/*
-To reduce the amount of memory required to contain the data for each pixel on
-the screen, we're going to use a lookup table mapping color IDs to RGB colors.
-This is sometimes called a 'color palette'.
+  /*
+  To reduce the amount of memory required to contain the data for each pixel on
+  the screen, we're going to use a lookup table mapping color IDs to RGB colors.
+  This is sometimes called a 'color palette'.
 
-This means that rather than having to store a red, green and blue value for each
-color, in our simulated program we can just use the ID of the color we want to
-use for each pixel, and when the simulated video hardware draws the screen it
-can look up the actual RGB color values to use for each pixel rendered.
+  This means that rather than having to store a red, green and blue value for each
+  color, in our simulated program we can just use the ID of the color we want to
+  use for each pixel, and when the simulated video hardware draws the screen it
+  can look up the actual RGB color values to use for each pixel rendered.
 
-The drawback of approach is that the colors you can use are much more limited,
-as you can only use a color if it's in the palette. It also means you can't
-simply lighten or darken colors using math (unless you use a clever layout of
-your palette).
-*/
+  The drawback of approach is that the colors you can use are much more limited,
+  as you can only use a color if it's in the palette. It also means you can't
+  simply lighten or darken colors using math (unless you use a clever layout of
+  your palette).
+  */
 
-const COLOR_PALETTE = {
-  '0':  [  0,  0,  0], // Black
-  '1':  [255,255,255], // White
-  '2':  [255,  0,  0], // Red
-  '3':  [  0,255,  0], // Lime 
-  '4':  [  0,  0,255], // Blue 
-  '5':  [255,255,  0], // Yellow 
-  '6':  [  0,255,255], // Cyan/Aqua
-  '7':  [255,  0,255], // Magenta/Fuchsia
-  '8':  [192,192,192], // Silver 
-  '9':  [128,128,128], // Gray 
-  '10': [128,  0,  0], // Maroon 
-  '11': [128,128,  0], // Olive
-  '12': [  0,128,  0], // Green
-  '13': [128,  0,128], // Purple 
-  '14': [  0,128,128], // Teal 
-  '15': [  0,  0,128], // Navy 
+  COLOR_PALETTE: {
+    '0':  [  0,  0,  0], // Black
+    '1':  [255,255,255], // White
+    '2':  [255,  0,  0], // Red
+    '3':  [  0,255,  0], // Lime 
+    '4':  [  0,  0,255], // Blue 
+    '5':  [255,255,  0], // Yellow 
+    '6':  [  0,255,255], // Cyan/Aqua
+    '7':  [255,  0,255], // Magenta/Fuchsia
+    '8':  [192,192,192], // Silver 
+    '9':  [128,128,128], // Gray 
+    '10': [128,  0,  0], // Maroon 
+    '11': [128,128,  0], // Olive
+    '12': [  0,128,  0], // Green
+    '13': [128,  0,128], // Purple 
+    '14': [  0,128,128], // Teal 
+    '15': [  0,  0,128], // Navy 
+  },
+
+  getColor(pixelColorId, address) {
+    const color = this.COLOR_PALETTE[pixelColorId];
+    if (!color) {
+      throw new Error(`Invalid color code ${pixelColorId} at address ${address}`);
+    }
+    return color;
+  },
+
+  /*
+  Read the pixel values from video memory, look them up in our color palette, and
+  convert them to the format which the Canvas 2D API requires: an array of RGBA
+  values for each pixel. This format uses 4 consecutive array slots to represent
+  each pixel, one for each of the RGBA channels (red, green, blue, alpha).
+
+  We don't need to vary the alpha (opacity) values, so we'll just set them to 255
+  (full opacity) for every pixel.
+  */
+  drawScreen() {
+    const videoMemoryLength = memory.VIDEO_MEMORY_END - memory.VIDEO_MEMORY_START;
+    const pixelsRGBA = displayImageData.data;
+    for (var i = 0; i < videoMemoryLength; i++) {
+      const pixelColorId = memory.ram[memory.VIDEO_MEMORY_START + i];
+      const colorRGB = this.getColor(pixelColorId || 0, memory.VIDEO_MEMORY_START + i);
+      pixelsRGBA[i * 4] = colorRGB[0];
+      pixelsRGBA[i * 4 + 1] = colorRGB[1];
+      pixelsRGBA[i * 4 + 2] = colorRGB[2];
+      pixelsRGBA[i * 4 + 3] = 255; // full opacity
+    }
+
+    if (displayCanvasCtx == null) throw new Error('expected canvas context');
+    displayCanvasCtx.putImageData(displayImageData, 0, 0);
+  },
 };
 
-function getColor(pixelColorId, address) {
-  const color = COLOR_PALETTE[pixelColorId];
-  if (!color) {
-    throw new Error(`Invalid color code ${pixelColorId} at address ${address}`);
-  }
-  return color;
-}
-
-const canvasCtx = getCanvas().getContext('2d');
-if (canvasCtx == null) throw new Error('expected canvas context');
-const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
-/*
-Read the pixel values from video memory, look them up in our color palette, and
-convert them to the format which the Canvas 2D API requires: an array of RGBA
-values for each pixel. This format uses 4 consecutive array slots to represent
-each pixel, one for each of the RGBA channels (red, green, blue, alpha).
-
-We don't need to vary the alpha (opacity) values, so we'll just set them to 255
-(full opacity) for every pixel.
-*/
-
-const VIDEO_MEMORY_LENGTH = memory.VIDEO_MEMORY_END - memory.VIDEO_MEMORY_START;
-function drawScreen() {
-  const pixelsRGBA = imageData.data;
-  for (var i = 0; i < VIDEO_MEMORY_LENGTH; i++) {
-    const pixelColorId = memory.ram[memory.VIDEO_MEMORY_START + i];
-    const colorRGB = getColor(pixelColorId || 0, memory.VIDEO_MEMORY_START + i);
-    pixelsRGBA[i * 4] = colorRGB[0];
-    pixelsRGBA[i * 4 + 1] = colorRGB[1];
-    pixelsRGBA[i * 4 + 2] = colorRGB[2];
-    pixelsRGBA[i * 4 + 3] = 255; // full opacity
-  }
-
-  canvasCtx.putImageData(imageData, 0, 0);
-}
+const displayCanvasCtx = getCanvas().getContext('2d');
+if (displayCanvasCtx == null) throw new Error('expected canvas context');
+const displayImageData = displayCanvasCtx.createImageData(display.SCREEN_WIDTH, display.SCREEN_HEIGHT);
 
 // 4.INPUT
 
@@ -611,8 +614,8 @@ let mouseY = 0;
 const screenPageTop = getCanvas().getBoundingClientRect().top + window.scrollY;
 const screenPageLeft = getCanvas().getBoundingClientRect().left + window.scrollX;
 getCanvas().onmousemove = function(event) {
-  mouseX = Math.floor((event.pageX - screenPageTop) / SCREEN_PIXEL_SCALE);
-  mouseY = Math.floor((event.pageY - screenPageLeft) / SCREEN_PIXEL_SCALE);
+  mouseX = Math.floor((event.pageX - screenPageTop) / display.SCREEN_PIXEL_SCALE);
+  mouseY = Math.floor((event.pageY - screenPageLeft) / display.SCREEN_PIXEL_SCALE);
 }
 
 function updateInputs() {
@@ -624,7 +627,7 @@ function updateInputs() {
   memory.ram[memory.MOUSE_BUTTON_ADDRESS] = mouseDown ? 1 : 0;
   memory.ram[memory.MOUSE_X_ADDRESS] = mouseX;
   memory.ram[memory.MOUSE_Y_ADDRESS] = mouseY;
-  memory.ram[memory.MOUSE_PIXEL_ADDRESS] = memory.VIDEO_MEMORY_START + (Math.floor(mouseY)) * SCREEN_WIDTH + Math.floor(mouseX);
+  memory.ram[memory.MOUSE_PIXEL_ADDRESS] = memory.VIDEO_MEMORY_START + (Math.floor(mouseY)) * display.SCREEN_WIDTH + Math.floor(mouseX);
   memory.ram[memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
   memory.ram[memory.CURRENT_TIME_ADDRESS] = Date.now();
 }
@@ -979,7 +982,7 @@ function loadProgramAndReset() {
 }
 
 function updateOutputs() {
-  drawScreen();
+  display.drawScreen();
   updateAudio();
 }
 
@@ -1641,6 +1644,6 @@ function padRight(input, length) {
   return padded;
 }
 
-initScreen(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_PIXEL_SCALE);
+initScreen(display.SCREEN_WIDTH, display.SCREEN_HEIGHT, display.SCREEN_PIXEL_SCALE);
 initUI();
 loadProgramAndReset();
