@@ -16,7 +16,7 @@ Components: (do a ctrl-f find for them)
 
 // 1.MEMORY
 
-const memory = {
+const Memory = {
   /*
   We are going to use an array to simulate computer memory. We can store a number
   value at each position in the array, and we will use a number value to access
@@ -109,7 +109,7 @@ const memory = {
 
 // 2.CPU
 
-const cpu = {
+const CPU = {
   /*
   As we move through our program, we need to keep track of where we are up to.
   The program counter contains a memory address pointing to the location of the
@@ -120,7 +120,7 @@ const cpu = {
   right into the CPU, which just hold one value at a time, but can be accessed
   very quickly.
   */
-  programCounter: memory.PROGRAM_START,
+  programCounter: Memory.PROGRAM_START,
 
   /*
   We also need to keep track of whether the CPU is running or not. The 'break'
@@ -134,7 +134,7 @@ const cpu = {
   halted: false,
 
   reset() {
-    this.programCounter = memory.PROGRAM_START;
+    this.programCounter = Memory.PROGRAM_START;
     this.halted = false;
     this.running = false;
   },
@@ -144,10 +144,10 @@ const cpu = {
   opcode or data at that location
   */
   advanceProgramCounter() {
-    if (this.programCounter < memory.PROGRAM_MEMORY_START || this.programCounter >= memory.PROGRAM_MEMORY_END) {
+    if (this.programCounter < Memory.PROGRAM_MEMORY_START || this.programCounter >= Memory.PROGRAM_MEMORY_END) {
       throw new Error(`program counter outside valid program memory region at ${this.programCounter}`);
     }
-    return memory.get(this.programCounter++);
+    return Memory.get(this.programCounter++);
   },
 
   /*
@@ -155,7 +155,7 @@ const cpu = {
   implement them here with code, but a real CPU would have circuitry
   implementing each one of these possible actions, which include things like
   loading data from memory, comparing it, operating on and combining it, and
-  storing it back into memory.
+  storing it back into Memory.
 
   We assign numerical values called 'opcodes' to each of the instructions. When
   our program is 'assembled' from the program code text, the version of the
@@ -167,7 +167,7 @@ const cpu = {
   We'll make the opcodes numbers starting at 9000 to make the values a bit more
   distinctive when we see them in the memory viewer. We'll include some extra info
   about each of the instructions so our simulator user interface can show it
-  alongside the 'disassembled' view of the program code in memory.
+  alongside the 'disassembled' view of the program code in Memory.
   */
   instructions: {
     // this instruction is typically called 'mov', short for 'move', as in 'move
@@ -179,8 +179,8 @@ const cpu = {
       description: 'set value at address to the value at the given address',
       operands: [['destination', 'address'], ['source', 'address']],
       execute(destination, sourceAddress) {
-        const sourceValue = memory.get(sourceAddress);
-        memory.set(destination, sourceValue);
+        const sourceValue = Memory.get(sourceAddress);
+        Memory.set(destination, sourceValue);
       },
     },
     copy_to_from_constant: {
@@ -188,7 +188,7 @@ const cpu = {
       description: 'set value at address to the given constant value',
       operands: [['destination', 'address'], ['source', 'constant']],
       execute(address, sourceValue) {
-        memory.set(address, sourceValue);
+        Memory.set(address, sourceValue);
       },
     },
     copy_to_from_ptr: {
@@ -197,9 +197,9 @@ const cpu = {
   address pointed to by the value at 'source' address`,
       operands: [['destination', 'address'], ['source', 'pointer']],
       execute(destinationAddress, sourcePointer) {
-        const sourceAddress = memory.get(sourcePointer);
-        const sourceValue = memory.get(sourceAddress);
-        memory.set(destinationAddress, sourceValue);
+        const sourceAddress = Memory.get(sourcePointer);
+        const sourceValue = Memory.get(sourceAddress);
+        Memory.set(destinationAddress, sourceValue);
       },
     },
     copy_into_ptr_from: {
@@ -208,9 +208,9 @@ const cpu = {
   'destination' address to the value at the source address`,
       operands: [['destination', 'pointer'], ['source', 'address']],
       execute(destinationPointer, sourceAddress) {
-        const destinationAddress = memory.get(destinationPointer);
-        const sourceValue = memory.get(sourceAddress);
-        memory.set(destinationAddress, sourceValue);
+        const destinationAddress = Memory.get(destinationPointer);
+        const sourceValue = Memory.get(sourceAddress);
+        Memory.set(destinationAddress, sourceValue);
       },
     },
     copy_address_of_label: {
@@ -219,7 +219,7 @@ const cpu = {
   given`,
       operands: [['destination', 'address'], ['source', 'label']],
       execute(destinationAddress, labelAddress) {
-        memory.set(destinationAddress, labelAddress);
+        Memory.set(destinationAddress, labelAddress);
       },
     },
     add: {
@@ -228,10 +228,10 @@ const cpu = {
   address and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         const result = a + b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     add_constant: {
@@ -240,9 +240,9 @@ const cpu = {
   the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, b, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         const result = a + b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     subtract: {
@@ -251,10 +251,10 @@ const cpu = {
   'b' address and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         const result = a - b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     subtract_constant: {
@@ -263,9 +263,9 @@ const cpu = {
   store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, b, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         const result = a - b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     multiply: {
@@ -274,10 +274,10 @@ const cpu = {
   address and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         const result = a * b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     multiply_constant: {
@@ -286,9 +286,9 @@ const cpu = {
   store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, b, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         const result = a * b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     divide: {
@@ -297,11 +297,11 @@ const cpu = {
   the 'b' address and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         if (b === 0) throw new Error('tried to divide by zero');
         const result = Math.floor(a / b);
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     divide_constant: {
@@ -310,10 +310,10 @@ const cpu = {
   and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, b, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         if (b === 0) throw new Error('tried to divide by zero');
         const result = Math.floor(a / b);
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     modulo: {
@@ -322,11 +322,11 @@ const cpu = {
   address and store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         if (b === 0) throw new Error('tried to modulo by zero');
         const result = a % b;
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     modulo_constant: {
@@ -335,10 +335,10 @@ const cpu = {
   store the result at the 'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, b, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         const result = a % b;
         if (b === 0) throw new Error('tried to modulo by zero');
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     compare: {
@@ -348,15 +348,15 @@ const cpu = {
   'result' address`,
       operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         let result = 0;
         if (a < b) {
           result = -1;
         } else if (a > b) {
           result = 1;
         }
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     compare_constant: {
@@ -366,7 +366,7 @@ const cpu = {
   'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
       execute(aAddress, bAddress, resultAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         const b = bAddress;
         let result = 0;
         if (a < b) {
@@ -374,7 +374,7 @@ const cpu = {
         } else if (a > b) {
           result = 1;
         }
-        memory.set(resultAddress, result);
+        Memory.set(resultAddress, result);
       },
     },
     'jump_to':  {
@@ -383,7 +383,7 @@ const cpu = {
   so the program continues from there`,
       operands: [['destination', 'label']],
       execute(labelAddress) {
-        cpu.programCounter = labelAddress;
+        CPU.programCounter = labelAddress;
       },
     },
     'branch_if_equal':  {
@@ -393,10 +393,10 @@ const cpu = {
   program continues from there`,
       operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
       execute(aAddress, bAddress, labelAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         if (a === b)  {
-          cpu.programCounter = labelAddress;
+          CPU.programCounter = labelAddress;
         }
       },
     },
@@ -407,9 +407,9 @@ const cpu = {
   from there`,
       operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
       execute(aAddress, b, labelAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         if (a === b)  {
-          cpu.programCounter = labelAddress;
+          CPU.programCounter = labelAddress;
         }
       },
     },
@@ -420,10 +420,10 @@ const cpu = {
   the program continues from there`,
       operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
       execute(aAddress, bAddress, labelAddress) {
-        const a = memory.get(aAddress);
-        const b = memory.get(bAddress);
+        const a = Memory.get(aAddress);
+        const b = Memory.get(bAddress);
         if (a !== b)  {
-          cpu.programCounter = labelAddress;
+          CPU.programCounter = labelAddress;
         }
       },
     },
@@ -434,9 +434,9 @@ const cpu = {
   continues from there`,
       operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
       execute(aAddress, b, labelAddress) {
-        const a = memory.get(aAddress);
+        const a = Memory.get(aAddress);
         if (a !== b)  {
-          cpu.programCounter = labelAddress;
+          CPU.programCounter = labelAddress;
         }
       },
     },
@@ -454,7 +454,7 @@ const cpu = {
       description: 'pause program execution, so it must be resumed via simulator UI',
       operands: [],
       execute() {
-        cpu.running = false;
+        CPU.running = false;
       },
     },
     'halt': {
@@ -462,8 +462,8 @@ const cpu = {
       description: 'end program execution, requiring the simulator to be reset to start again',
       operands: [],
       execute() {
-        cpu.running = false;
-        cpu.halted = true;
+        CPU.running = false;
+        CPU.halted = true;
       },
     },
   },
@@ -482,7 +482,7 @@ const cpu = {
   output devices (screen, audio).
   */
   step() {
-    input.updateInputs();
+    Input.updateInputs();
     const opcode = this.advanceProgramCounter();
     const instructionName = this.opcodesToInstructions.get(opcode);
     if (!instructionName) {
@@ -509,7 +509,7 @@ const cpu = {
 
 // 3.DISPLAY
 
-const display = {
+const Display = {
   SCREEN_WIDTH: 30,
   SCREEN_HEIGHT: 30,
   SCREEN_PIXEL_SCALE: 20,
@@ -571,11 +571,11 @@ const display = {
   */
   drawScreen() {
     const imageData = this.getImageData();
-    const videoMemoryLength = memory.VIDEO_MEMORY_END - memory.VIDEO_MEMORY_START;
+    const videoMemoryLength = Memory.VIDEO_MEMORY_END - Memory.VIDEO_MEMORY_START;
     const pixelsRGBA = imageData.data;
     for (var i = 0; i < videoMemoryLength; i++) {
-      const pixelColorId = memory.ram[memory.VIDEO_MEMORY_START + i];
-      const colorRGB = this.getColor(pixelColorId || 0, memory.VIDEO_MEMORY_START + i);
+      const pixelColorId = Memory.ram[Memory.VIDEO_MEMORY_START + i];
+      const colorRGB = this.getColor(pixelColorId || 0, Memory.VIDEO_MEMORY_START + i);
       pixelsRGBA[i * 4] = colorRGB[0];
       pixelsRGBA[i * 4 + 1] = colorRGB[1];
       pixelsRGBA[i * 4 + 2] = colorRGB[2];
@@ -596,7 +596,7 @@ const display = {
 
   init() {
     const canvasCtx = notNull(SimulatorUI.getCanvas().getContext('2d'));
-    const imageData = canvasCtx.createImageData(display.SCREEN_WIDTH, display.SCREEN_HEIGHT);
+    const imageData = canvasCtx.createImageData(Display.SCREEN_WIDTH, Display.SCREEN_HEIGHT);
     this.imageData = (imageData/*: any */);
     this.canvasCtx = (canvasCtx/*: any */);
   },
@@ -613,7 +613,7 @@ Because the browser provides an event-based API for input, we need to listen for
 relevent keyboard and mouse events and keep track of their state and expose it
 to the simulated computer.
 */
-const input = {
+const Input = {
   keysPressed: new Set(),
   mouseDown: false,
   mouseX: 0,
@@ -639,29 +639,29 @@ const input = {
     const screenPageTop = SimulatorUI.getCanvas().getBoundingClientRect().top + window.scrollY;
     const screenPageLeft = SimulatorUI.getCanvas().getBoundingClientRect().left + window.scrollX;
     SimulatorUI.getCanvas().onmousemove = (event) => {
-      this.mouseX = Math.floor((event.pageX - screenPageTop) / display.SCREEN_PIXEL_SCALE);
-      this.mouseY = Math.floor((event.pageY - screenPageLeft) / display.SCREEN_PIXEL_SCALE);
+      this.mouseX = Math.floor((event.pageX - screenPageTop) / Display.SCREEN_PIXEL_SCALE);
+      this.mouseY = Math.floor((event.pageY - screenPageLeft) / Display.SCREEN_PIXEL_SCALE);
     };
   },
 
   updateInputs() {
     const mostRecentKeys = Array.from(this.keysPressed.values()).reverse();
 
-    memory.ram[memory.KEYCODE_0_ADDRESS] = mostRecentKeys[0] || 0;
-    memory.ram[memory.KEYCODE_1_ADDRESS] = mostRecentKeys[1] || 0;
-    memory.ram[memory.KEYCODE_2_ADDRESS] = mostRecentKeys[2] || 0;
-    memory.ram[memory.MOUSE_BUTTON_ADDRESS] = this.mouseDown ? 1 : 0;
-    memory.ram[memory.MOUSE_X_ADDRESS] = this.mouseX;
-    memory.ram[memory.MOUSE_Y_ADDRESS] = this.mouseY;
-    memory.ram[memory.MOUSE_PIXEL_ADDRESS] = memory.VIDEO_MEMORY_START + (Math.floor(this.mouseY)) * display.SCREEN_WIDTH + Math.floor(this.mouseX);
-    memory.ram[memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
-    memory.ram[memory.CURRENT_TIME_ADDRESS] = Date.now();
+    Memory.ram[Memory.KEYCODE_0_ADDRESS] = mostRecentKeys[0] || 0;
+    Memory.ram[Memory.KEYCODE_1_ADDRESS] = mostRecentKeys[1] || 0;
+    Memory.ram[Memory.KEYCODE_2_ADDRESS] = mostRecentKeys[2] || 0;
+    Memory.ram[Memory.MOUSE_BUTTON_ADDRESS] = this.mouseDown ? 1 : 0;
+    Memory.ram[Memory.MOUSE_X_ADDRESS] = this.mouseX;
+    Memory.ram[Memory.MOUSE_Y_ADDRESS] = this.mouseY;
+    Memory.ram[Memory.MOUSE_PIXEL_ADDRESS] = Memory.VIDEO_MEMORY_START + (Math.floor(this.mouseY)) * Display.SCREEN_WIDTH + Math.floor(this.mouseX);
+    Memory.ram[Memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
+    Memory.ram[Memory.CURRENT_TIME_ADDRESS] = Date.now();
   },
 };
 
 // 5.AUDIO
 
-const audio = {
+const Audio = {
   WAVETYPES: {
     '0': 'square',
     '1': 'sawtooth',
@@ -704,9 +704,9 @@ const audio = {
 
   updateAudio() {
     this.audioChannels.forEach(channel => {
-      const frequency = (memory.ram[channel.freqAddr] || 0) / 1000;
-      const gain = !cpu.running ? 0 : (memory.ram[channel.volAddr] || 0) / 100 * this.MAX_GAIN;
-      const oscillatorType = this.WAVETYPES[memory.ram[channel.wavetypeAddr] || 0];
+      const frequency = (Memory.ram[channel.freqAddr] || 0) / 1000;
+      const gain = !CPU.running ? 0 : (Memory.ram[channel.volAddr] || 0) / 100 * this.MAX_GAIN;
+      const oscillatorType = this.WAVETYPES[Memory.ram[channel.wavetypeAddr] || 0];
 
       const {state} = channel;
       if (state.gain !== gain) {
@@ -726,19 +726,19 @@ const audio = {
 
   init() {
     this.addAudioChannel(
-      memory.AUDIO_CH1_WAVETYPE_ADDRESS,
-      memory.AUDIO_CH1_FREQUENCY_ADDRESS,
-      memory.AUDIO_CH1_VOLUME_ADDRESS
+      Memory.AUDIO_CH1_WAVETYPE_ADDRESS,
+      Memory.AUDIO_CH1_FREQUENCY_ADDRESS,
+      Memory.AUDIO_CH1_VOLUME_ADDRESS
     );
     this.addAudioChannel(
-      memory.AUDIO_CH2_WAVETYPE_ADDRESS,
-      memory.AUDIO_CH2_FREQUENCY_ADDRESS,
-      memory.AUDIO_CH2_VOLUME_ADDRESS
+      Memory.AUDIO_CH2_WAVETYPE_ADDRESS,
+      Memory.AUDIO_CH2_FREQUENCY_ADDRESS,
+      Memory.AUDIO_CH2_VOLUME_ADDRESS
     );
     this.addAudioChannel(
-      memory.AUDIO_CH3_WAVETYPE_ADDRESS,
-      memory.AUDIO_CH3_FREQUENCY_ADDRESS,
-      memory.AUDIO_CH3_VOLUME_ADDRESS
+      Memory.AUDIO_CH3_WAVETYPE_ADDRESS,
+      Memory.AUDIO_CH3_FREQUENCY_ADDRESS,
+      Memory.AUDIO_CH3_VOLUME_ADDRESS
     );
   },
 };
@@ -748,7 +748,7 @@ const audio = {
 /*
 We use a simple text-based language to input our program. This is our 'assembly
 language'. We need to convert it into a form which is made up of only numerical
-values so we can load it into our computer's memory. This is a two step process:
+values so we can load it into our computer's Memory. This is a two step process:
 
 1. parse program text into an array of objects representing our instructions and
   their operands.
@@ -760,14 +760,14 @@ splitting those lines into tokens (words), which gives us to an instruction name
 and operands for that instruction, from each line.
 */
 
-const assembler = {
+const Assembler = {
   // we'll keep a map of instructions which take a label as an operand so we
   // know when to substitute an operand for the corresponding label address
   instructionsLabelOperands: new Map(),
 
   initInstructionsLabelOperands() {
-    Object.keys(cpu.instructions).forEach(name => {
-      const labelOperandIndex = cpu.instructions[name].operands.findIndex(operand =>
+    Object.keys(CPU.instructions).forEach(name => {
+      const labelOperandIndex = CPU.instructions[name].operands.findIndex(operand =>
         operand[1] === 'label'
       );
       if (labelOperandIndex > -1) {
@@ -831,7 +831,7 @@ const assembler = {
         instruction.name !== 'data' &&
         instruction.name !== 'define'
       ) {
-        const expectedOperands = cpu.instructions[instruction.name].operands;
+        const expectedOperands = CPU.instructions[instruction.name].operands;
         if (instruction.operands.length !== expectedOperands.length) {
           throw new Error(`Wrong number of operands for instruction ${instruction.name}
   got ${instruction.operands.length}, expected ${expectedOperands.length}
@@ -860,7 +860,7 @@ const assembler = {
     // instruction, which we can substitute for the actual location once we know
     // the memory locations in the assembled program which the labels refer to.
     const labelAddresses = {};
-    let labelAddress = memory.PROGRAM_START;
+    let labelAddress = Memory.PROGRAM_START;
     for (let instruction of programInstructions) {
       if (instruction.name === 'label') {
         const labelName = instruction.operands[0];
@@ -876,7 +876,7 @@ const assembler = {
     const defines = {};
 
     // load instructions and operands into memory
-    let loadingAddress = memory.PROGRAM_START;
+    let loadingAddress = Memory.PROGRAM_START;
     for (let instruction of programInstructions) {
       if (instruction.name === 'label') {
         continue;
@@ -888,17 +888,17 @@ const assembler = {
 
       if (instruction.name === 'data') {
         for (var i = 0; i < instruction.operands.length; i++) {
-          memory.ram[loadingAddress++] = instruction.operands[i];
+          Memory.ram[loadingAddress++] = instruction.operands[i];
         }
         continue;
       }
 
       // for each instruction, we first write the relevant opcode to memory
-      const opcode = cpu.instructionsToOpcodes.get(instruction.name);
+      const opcode = CPU.instructionsToOpcodes.get(instruction.name);
       if (!opcode) {
         throw new Error(`No opcode found for instruction '${instruction.name}'`);
       }
-      memory.ram[loadingAddress++] = opcode;
+      Memory.ram[loadingAddress++] = opcode;
       
       // then, we write the operands for instruction to memory
       const operands = instruction.operands.slice(0);
@@ -927,7 +927,7 @@ const assembler = {
           value = operands[i];
         }
 
-        memory.ram[loadingAddress++] = value;
+        Memory.ram[loadingAddress++] = value;
       }
     }
   },
@@ -939,50 +939,50 @@ const assembler = {
 
 // 7.SIMULATION CONTROL
 
-const simulation = {
+const Simulation = {
   CYCLES_PER_YIELD: 997,
 
   delayBetweenCycles: 0,
 
   loop() {
-    if (simulation.delayBetweenCycles === 0) {
+    if (Simulation.delayBetweenCycles === 0) {
       // running full speed, execute a bunch of instructions before yielding
       // to the JS event loop, to achieve decent 'real time' execution speed
-      for (var i = 0; i < simulation.CYCLES_PER_YIELD; i++) {
-        if (!cpu.running) {
-          simulation.stop();
+      for (var i = 0; i < Simulation.CYCLES_PER_YIELD; i++) {
+        if (!CPU.running) {
+          Simulation.stop();
           break;
         }
-        cpu.step();
+        CPU.step();
       }
     } else {
       // run only one execution before yielding to the JS event loop so screen
       // and UI changes can be shown, and new mouse and keyboard input taken
-      cpu.step();
+      CPU.step();
       SimulatorUI.updateUI();
     }
-    simulation.updateOutputs();
-    if (cpu.running) {
-      setTimeout(simulation.loop, simulation.delayBetweenCycles);
+    Simulation.updateOutputs();
+    if (CPU.running) {
+      setTimeout(Simulation.loop, Simulation.delayBetweenCycles);
     }
   },
 
   run() {
-    cpu.running = true;
+    CPU.running = true;
     SimulatorUI.updateUI();
     SimulatorUI.updateSpeedUI();
     this.loop();
   },
 
   stop() {
-    cpu.running = false;
+    CPU.running = false;
     SimulatorUI.updateUI();
     SimulatorUI.updateSpeedUI();
   },
 
   updateOutputs() {
-    display.drawScreen();
-    audio.updateAudio();
+    Display.drawScreen();
+    Audio.updateAudio();
   },
 
   loadProgramAndReset() {
@@ -994,20 +994,20 @@ const simulation = {
     for us to mistakenly read from the wrong place in memory if we have a bug in
     our simulated program where we get the memory address wrong.
     */
-    for (var i = 0; i < memory.TOTAL_MEMORY_SIZE; i++) {
-      memory.ram[i] = 0;
+    for (var i = 0; i < Memory.TOTAL_MEMORY_SIZE; i++) {
+      Memory.ram[i] = 0;
     }
 
     const programText = SimulatorUI.getProgramText();
     try {
-      assembler.assembleAndLoadProgram(assembler.parseProgramText(programText));
+      Assembler.assembleAndLoadProgram(Assembler.parseProgramText(programText));
     } catch (err) {
       alert(err.stack);
       console.error(err.stack)
     }
     SimulatorUI.setLoadedProgramText(programText);
 
-    cpu.reset();
+    CPU.reset();
     this.updateOutputs();
     SimulatorUI.updateProgramMemoryView();
     SimulatorUI.updateUI();
@@ -1015,15 +1015,15 @@ const simulation = {
   },
 
   stepOnce() {
-    cpu.running = true;
-    cpu.step();
-    cpu.running = false;
+    CPU.running = true;
+    CPU.step();
+    CPU.running = false;
     this.updateOutputs();
     SimulatorUI.updateUI();
   },
 
   runStop() {
-    if (cpu.running) {
+    if (CPU.running) {
       this.stop();
     } else {
       this.run();
@@ -1547,38 +1547,38 @@ const SimulatorUI = {
   },
 
   setSpeed() {
-    simulation.delayBetweenCycles = -parseInt(UI.$Input('#speed').value, 10);
+    Simulation.delayBetweenCycles = -parseInt(UI.$Input('#speed').value, 10);
     this.updateSpeedUI();
   },
 
   setFullspeed() {
     const fullspeedEl = UI.$Input('#fullspeed');
     if (fullspeedEl && fullspeedEl.checked) {
-      simulation.delayBetweenCycles = 0;
+      Simulation.delayBetweenCycles = 0;
     } else {
-      simulation.delayBetweenCycles = 1;
+      Simulation.delayBetweenCycles = 1;
     }
     this.updateSpeedUI();
   },
 
   updateSpeedUI() {
-    const fullspeed = simulation.delayBetweenCycles === 0;
-    const runningAtFullspeed = cpu.running && fullspeed;
+    const fullspeed = Simulation.delayBetweenCycles === 0;
+    const runningAtFullspeed = CPU.running && fullspeed;
     UI.$Input('#fullspeed').checked = fullspeed;
-    UI.$Input('#speed').value = String(-simulation.delayBetweenCycles);
+    UI.$Input('#speed').value = String(-Simulation.delayBetweenCycles);
     UI.$('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
     UI.$('#debuggerMessageArea').textContent = runningAtFullspeed ?
-      'debug UI disabled when cpu.running at full speed' : '';
+      'debug UI disabled when CPU.running at full speed' : '';
   },
 
   updateUI() {
-    UI.$Input('#programCounter').value = String(cpu.programCounter);
-    if (cpu.halted) {
+    UI.$Input('#programCounter').value = String(CPU.programCounter);
+    if (CPU.halted) {
       UI.$('#running').textContent = 'halted';
       UI.$Button('#stepButton').disabled = true;
       UI.$Button('#runButton').disabled = true;
     } else {
-      UI.$('#running').textContent = cpu.running ? 'running' : 'paused';
+      UI.$('#running').textContent = CPU.running ? 'running' : 'paused';
       UI.$Button('#stepButton').disabled = false;
       UI.$Button('#runButton').disabled = false;
     }
@@ -1586,17 +1586,17 @@ const SimulatorUI = {
     this.updateInputMemoryView();
     this.updateVideoMemoryView();
     this.updateAudioMemoryView();
-    if (simulation.delayBetweenCycles > 300 || !cpu.running) {
+    if (Simulation.delayBetweenCycles > 300 || !CPU.running) {
       if (typeof this.scrollToProgramLine == 'function') {
-        this.scrollToProgramLine(Math.max(0, cpu.programCounter - memory.PROGRAM_MEMORY_START - 3));
+        this.scrollToProgramLine(Math.max(0, CPU.programCounter - Memory.PROGRAM_MEMORY_START - 3));
       }
     }
   },
 
   updateWorkingMemoryView() {
     const lines = [];
-    for (var i = memory.WORKING_MEMORY_START; i < memory.WORKING_MEMORY_END; i++) {
-      lines.push(`${i}: ${memory[i]}`);
+    for (var i = Memory.WORKING_MEMORY_START; i < Memory.WORKING_MEMORY_END; i++) {
+      lines.push(`${i}: ${Memory.ram[i]}`);
     }
     UI.$TextArea('#workingMemoryView').textContent = lines.join('\n');
   },
@@ -1604,13 +1604,13 @@ const SimulatorUI = {
   scrollToProgramLine: (item) => {},
   updateProgramMemoryView() {
     const lines = [];
-    for (var i = memory.PROGRAM_MEMORY_START; i < memory.PROGRAM_MEMORY_END; i++) {
-      const instruction = cpu.opcodesToInstructions.get(memory[i]);
-      lines.push(`${padRight(i, 4)}: ${padRight(memory[i], 8)} ${instruction || ''}`);
+    for (var i = Memory.PROGRAM_MEMORY_START; i < Memory.PROGRAM_MEMORY_END; i++) {
+      const instruction = CPU.opcodesToInstructions.get(Memory.ram[i]);
+      lines.push(`${padRight(i, 4)}: ${padRight(Memory.ram[i], 8)} ${instruction || ''}`);
       if (instruction) {
-        const operands = cpu.instructions[instruction].operands;
+        const operands = CPU.instructions[instruction].operands;
         for (var j = 0; j < operands.length; j++) {
-          lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
+          lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(Memory.ram[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
         }
         i += operands.length;
       }
@@ -1625,7 +1625,7 @@ const SimulatorUI = {
       (start, end) => (
         lines.slice(start, end)
           .map((l, i) => {
-            const current = memory.PROGRAM_MEMORY_START + start + i === cpu.programCounter;
+            const current = Memory.PROGRAM_MEMORY_START + start + i === CPU.programCounter;
             return `
   <pre
     class="tablerow"
@@ -1647,35 +1647,35 @@ const SimulatorUI = {
 
   updateInputMemoryView() {
     UI.$TextArea('#inputMemoryView').textContent =
-      `${memory.KEYCODE_0_ADDRESS}: ${padRight(memory[memory.KEYCODE_0_ADDRESS], 8)} keycode 0
-  ${memory.KEYCODE_1_ADDRESS}: ${padRight(memory[memory.KEYCODE_1_ADDRESS], 8)} keycode 1
-  ${memory.KEYCODE_2_ADDRESS}: ${padRight(memory[memory.KEYCODE_2_ADDRESS], 8)} keycode 2
-  ${memory.MOUSE_X_ADDRESS}: ${padRight(memory[memory.MOUSE_X_ADDRESS], 8)} mouse x
-  ${memory.MOUSE_Y_ADDRESS}: ${padRight(memory[memory.MOUSE_Y_ADDRESS], 8)} mouse y
-  ${memory.MOUSE_PIXEL_ADDRESS}: ${padRight(memory[memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
-  ${memory.MOUSE_BUTTON_ADDRESS}: ${padRight(memory[memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
-  ${memory.RANDOM_NUMBER_ADDRESS}: ${padRight(memory[memory.RANDOM_NUMBER_ADDRESS], 8)} random number`;
+      `${Memory.KEYCODE_0_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_0_ADDRESS], 8)} keycode 0
+  ${Memory.KEYCODE_1_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_1_ADDRESS], 8)} keycode 1
+  ${Memory.KEYCODE_2_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_2_ADDRESS], 8)} keycode 2
+  ${Memory.MOUSE_X_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_X_ADDRESS], 8)} mouse x
+  ${Memory.MOUSE_Y_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_Y_ADDRESS], 8)} mouse y
+  ${Memory.MOUSE_PIXEL_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
+  ${Memory.MOUSE_BUTTON_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
+  ${Memory.RANDOM_NUMBER_ADDRESS}: ${padRight(Memory.ram[Memory.RANDOM_NUMBER_ADDRESS], 8)} random number`;
   },
 
   updateVideoMemoryView() {
     const lines = [];
-    for (var i = memory.VIDEO_MEMORY_START; i < memory.VIDEO_MEMORY_END; i++) {
-      lines.push(`${i}: ${memory[i]}`);
+    for (var i = Memory.VIDEO_MEMORY_START; i < Memory.VIDEO_MEMORY_END; i++) {
+      lines.push(`${i}: ${Memory.ram[i]}`);
     }
     UI.$TextArea('#videoMemoryView').textContent = lines.join('\n');
   },
 
   updateAudioMemoryView() {
     UI.$TextArea('#audioMemoryView').textContent =
-  `${memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
-  ${memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
-  ${memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
-  ${memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
-  ${memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
-  ${memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
-  ${memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
-  ${memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
-  ${memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(memory[memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
+  `${Memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
+  ${Memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
+  ${Memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
+  ${Memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
+  ${Memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
+  ${Memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
+  ${Memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
+  ${Memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
+  ${Memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
   },
 }
 
@@ -1697,11 +1697,11 @@ function notNull(val) {
   throw new Error('unexpected null');
 }
 
-cpu.init();
-display.init();
-input.init();
-audio.init();
-assembler.init();
-SimulatorUI.initScreen(display.SCREEN_WIDTH, display.SCREEN_HEIGHT, display.SCREEN_PIXEL_SCALE);
+CPU.init();
+Display.init();
+Input.init();
+Audio.init();
+Assembler.init();
+SimulatorUI.initScreen(Display.SCREEN_WIDTH, Display.SCREEN_HEIGHT, Display.SCREEN_PIXEL_SCALE);
 SimulatorUI.initUI();
-simulation.loadProgramAndReset();
+Simulation.loadProgramAndReset();

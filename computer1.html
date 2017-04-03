@@ -42,7 +42,7 @@
         <label>
           program:
           <select id="programSelector" onchange="SimulatorUI.selectProgram()"></select>
-          <button id="loadProgramButton" onclick="simulation.loadProgramAndReset()">load program</button>
+          <button id="loadProgramButton" onclick="Simulation.loadProgramAndReset()">load program</button>
         </label>
         <textarea id="program" rows="10" cols="80" onchange="SimulatorUI.editProgramText()" onkeyup="editProgramText()" style="margin-top: 10px">
         </textarea>
@@ -50,9 +50,9 @@
     </div>
     <div style="flex: 1">
       <div style="height: 30px">
-        <button id="runButton" onclick="simulation.runStop()">run/stop</button>
-        <button id="stepButton" onclick="simulation.stepOnce()">step</button>
-        <button onclick="simulation.loadProgramAndReset()">reset</button>
+        <button id="runButton" onclick="Simulation.runStop()">run/stop</button>
+        <button id="stepButton" onclick="Simulation.stepOnce()">step</button>
+        <button onclick="Simulation.loadProgramAndReset()">reset</button>
         <span id="running"></span>
       </div>
       <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="SimulatorUI.setSpeed()"></input>
