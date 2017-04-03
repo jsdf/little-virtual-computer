@@ -928,92 +928,96 @@ assembler.init();
 
 // 7.SIMULATION CONTROL
 
-function runStop() {
-  if (cpu.running) {
-    stop();
-  } else {
-    run();
-  }
-}
+const simulation = {
+  CYCLES_PER_YIELD: 997,
 
-function run() {
-  cpu.running = true;
-  updateUI();
-  updateSpeedUI();
-  loop();
-}
+  delayBetweenCycles: 0,
 
-function stop() {
-  cpu.running = false;
-  updateUI();
-  updateSpeedUI();
-}
-
-function stepOnce() {
-  cpu.running = true;
-  cpu.step();
-  cpu.running = false;
-  updateOutputs();
-  updateUI();
-}
-
-let delayBetweenCycles = 0;
-const CYCLES_PER_YIELD = 997;
-function loop() {
-  if (delayBetweenCycles === 0) {
-    // running full speed, execute a bunch of instructions before yielding
-    // to the JS event loop, to achieve decent 'real time' execution speed
-    for (var i = 0; i < CYCLES_PER_YIELD; i++) {
-      if (!cpu.running) {
-        stop();
-        break;
+  loop() {
+    if (this.delayBetweenCycles === 0) {
+      // running full speed, execute a bunch of instructions before yielding
+      // to the JS event loop, to achieve decent 'real time' execution speed
+      for (var i = 0; i < this.CYCLES_PER_YIELD; i++) {
+        if (!cpu.running) {
+          this.stop();
+          break;
+        }
+        cpu.step();
       }
+    } else {
+      // run only one execution before yielding to the JS event loop so screen
+      // and UI changes can be shown, and new mouse and keyboard input taken
       cpu.step();
+      updateUI();
     }
-  } else {
-    // run only one execution before yielding to the JS event loop so screen
-    // and UI changes can be shown, and new mouse and keyboard input taken
-    cpu.step();
+    this.updateOutputs();
+    if (cpu.running) {
+      setTimeout(this.loop, this.delayBetweenCycles);
+    }
+  },
+
+  run() {
+    cpu.running = true;
     updateUI();
-  }
-  updateOutputs();
-  if (cpu.running) {
-    setTimeout(loop, delayBetweenCycles);
-  }
-}
+    updateSpeedUI();
+    this.loop();
+  },
 
-function loadProgramAndReset() {
-  /*
-  In a real computer, memory addresses which have never had any value set are
-  considered 'uninitialized', and might contain any garbage value, but to keep
-  our simulation simple we're going to initialize every location with the value
-  0. However, just like in a real computer, in our simulation it is possible
-  for us to mistakenly read from the wrong place in memory if we have a bug in
-  our simulated program where we get the memory address wrong.
-  */
-  for (var i = 0; i < memory.TOTAL_MEMORY_SIZE; i++) {
-    memory.ram[i] = 0;
-  }
+  stop() {
+    cpu.running = false;
+    updateUI();
+    updateSpeedUI();
+  },
 
-  const programText = getProgramText();
-  try {
-    assembler.assembleAndLoadProgram(assembler.parseProgramText(programText));
-  } catch (err) {
-    alert(err.stack);
-    console.error(err.stack)
-  }
-  setLoadedProgramText(programText);
+  updateOutputs() {
+    display.drawScreen();
+    audio.updateAudio();
+  },
 
-  cpu.reset();
-  updateOutputs();
-  updateProgramMemoryView();
-  updateUI();
-  updateSpeedUI();
-}
+  loadProgramAndReset() {
+    /*
+    In a real computer, memory addresses which have never had any value set are
+    considered 'uninitialized', and might contain any garbage value, but to keep
+    our simulation simple we're going to initialize every location with the value
+    0. However, just like in a real computer, in our simulation it is possible
+    for us to mistakenly read from the wrong place in memory if we have a bug in
+    our simulated program where we get the memory address wrong.
+    */
+    for (var i = 0; i < memory.TOTAL_MEMORY_SIZE; i++) {
+      memory.ram[i] = 0;
+    }
 
-function updateOutputs() {
-  display.drawScreen();
-  audio.updateAudio();
+    const programText = getProgramText();
+    try {
+      assembler.assembleAndLoadProgram(assembler.parseProgramText(programText));
+    } catch (err) {
+      alert(err.stack);
+      console.error(err.stack)
+    }
+    setLoadedProgramText(programText);
+
+    cpu.reset();
+    this.updateOutputs();
+    updateProgramMemoryView();
+    updateUI();
+    updateSpeedUI();
+  },
+
+  stepOnce() {
+    cpu.running = true;
+    cpu.step();
+    cpu.running = false;
+    this.updateOutputs();
+    updateUI();
+  },
+
+  runStop() {
+    if (cpu.running) {
+      this.stop();
+    } else {
+      this.run();
+    }
+  },
 }
 
 // 8.BUILT-IN PROGRAMS
@@ -1499,25 +1503,25 @@ function editProgramText() {
 }
 
 function setSpeed() {
-  delayBetweenCycles = -parseInt($Input('#speed').value, 10);
+  simulation.delayBetweenCycles = -parseInt($Input('#speed').value, 10);
   updateSpeedUI();
 }
 
 function setFullspeed() {
   const fullspeedEl = $Input('#fullspeed');
   if (fullspeedEl && fullspeedEl.checked) {
-    delayBetweenCycles = 0;
+    simulation.delayBetweenCycles = 0;
   } else {
-    delayBetweenCycles = 1;
+    simulation.delayBetweenCycles = 1;
   }
   updateSpeedUI();
 }
 
 function updateSpeedUI() {
-  const fullspeed = delayBetweenCycles === 0;
+  const fullspeed = simulation.delayBetweenCycles === 0;
   const runningAtFullspeed = cpu.running && fullspeed;
   $Input('#fullspeed').checked = fullspeed;
-  $Input('#speed').value = String(-delayBetweenCycles);
+  $Input('#speed').value = String(-simulation.delayBetweenCycles);
   $('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
   $('#debuggerMessageArea').textContent = runningAtFullspeed ?
     'debug UI disabled when cpu.running at full speed' : '';
@@ -1538,7 +1542,7 @@ function updateUI() {
   updateInputMemoryView();
   updateVideoMemoryView();
   updateAudioMemoryView();
-  if (delayBetweenCycles > 300 || !cpu.running) {
+  if (simulation.delayBetweenCycles > 300 || !cpu.running) {
     if (typeof scrollToProgramLine == 'function') {
       scrollToProgramLine(Math.max(0, cpu.programCounter - memory.PROGRAM_MEMORY_START - 3));
     }
@@ -1676,4 +1680,4 @@ function padRight(input, length) {
 
 initScreen(display.SCREEN_WIDTH, display.SCREEN_HEIGHT, display.SCREEN_PIXEL_SCALE);
 initUI();
-loadProgramAndReset();
+simulation.loadProgramAndReset();
