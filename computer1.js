@@ -1,3 +1,5 @@
+// @flow
+
 /*
 
 Components: (do a ctrl-f find for them)
@@ -105,389 +107,402 @@ function memoryGet(address) {
 
 // 2.CPU
 
-/*
-As we move through our program, we need to keep track of where we are up to.
-The program counter contains a memory address pointing to the location of the
-program instruction we are currently executing.
-In a real computer, there is a small piece of memory inside the CPU which
-holds this information, called the 'program counter'. The program counter is
-one of several 'registers', which are basically tiny pieces of memory built
-right into the CPU, which just hold one value at a time, but can be accessed
-very quickly.
-*/
-let programCounter = PROGRAM_START;
+const cpu = {
+  /*
+  As we move through our program, we need to keep track of where we are up to.
+  The program counter contains a memory address pointing to the location of the
+  program instruction we are currently executing.
+  In a real computer, there is a small piece of memory inside the CPU which
+  holds this information, called the 'program counter'. The program counter is
+  one of several 'registers', which are basically tiny pieces of memory built
+  right into the CPU, which just hold one value at a time, but can be accessed
+  very quickly.
+  */
+  programCounter: PROGRAM_START,
 
-/*
-We also need to keep track of whether the CPU is running or not. The 'break'
-instruction, which is like 'debugger' in Javascript, will be implemented by
-setting this to false. This will cause the simulator to stop, but we can still
-resume the program
-The 'halt' instruction will tell the CPU that we are at the end of the program,
-so it should stop executing instructions, and can't be resumed.
-*/
-let running = false;
-let halted = false;
+  /*
+  We also need to keep track of whether the CPU is running or not. The 'break'
+  instruction, which is like 'debugger' in Javascript, will be implemented by
+  setting this to false. This will cause the simulator to stop, but we can still
+  resume the program
+  The 'halt' instruction will tell the CPU that we are at the end of the program,
+  so it should stop executing instructions, and can't be resumed.
+  */
+  running: false,
+  halted: false,
 
-/*
-Move the program counter forward to the next memory address and return the
-opcode or data at that location
-*/
-function advanceProgramCounter() {
-  if (programCounter < PROGRAM_MEMORY_START || programCounter >= PROGRAM_MEMORY_END) {
-    throw new Error(`program counter outside valid program memory region at ${programCounter}`);
-  }
-  return memoryGet(programCounter++);
-}
+  reset() {
+    this.programCounter = PROGRAM_START;
+    this.halted = false;
+    this.running = false;
+  },
 
-/*
-These instructions represent the things the CPU can be told to do. We
-implement them here with code, but a real CPU would have circuitry
-implementing each one of these possible actions, which include things like
-loading data from memory, comparing it, operating on and combining it, and
-storing it back into memory.
+  /*
+  Move the program counter forward to the next memory address and return the
+  opcode or data at that location
+  */
+  advanceProgramCounter() {
+    if (this.programCounter < PROGRAM_MEMORY_START || this.programCounter >= PROGRAM_MEMORY_END) {
+      throw new Error(`program counter outside valid program memory region at ${this.programCounter}`);
+    }
+    return memoryGet(this.programCounter++);
+  },
 
-We assign numerical values called 'opcodes' to each of the instructions. When
-our program is 'assembled' from the program code text, the version of the
-program that we actually load into memory will use these numeric codes to refer
-to the CPU instructions in place of the textual names as a numeric value is a
-more efficient representation, especially as computers only directly understand
-numbers, whereas text is an abstraction on top of number values.
+  /*
+  These instructions represent the things the CPU can be told to do. We
+  implement them here with code, but a real CPU would have circuitry
+  implementing each one of these possible actions, which include things like
+  loading data from memory, comparing it, operating on and combining it, and
+  storing it back into memory.
 
-We'll make the opcodes numbers starting at 9000 to make the values a bit more
-distinctive when we see them in the memory viewer. We'll include some extra info
-about each of the instructions so our simulator user interface can show it
-alongside the 'disassembled' view of the program code in memory.
-*/
-const instructions = {
-  // this instruction is typically called 'mov', short for 'move', as in 'move
-  // value at *this* address to *that* address', but this naming can be a bit
-  // confusing, because the operation doesn't remove the value at the source
-  // address, as 'move' might seem to imply, so for clarity we'll call it 'copy_to_from' instead.
-  copy_to_from: {
-    opcode: 9000,
-    description: 'set value at address to the value at the given address',
-    operands: [['destination', 'address'], ['source', 'address']],
-    execute(destination, sourceAddress) {
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destination, sourceValue);
+  We assign numerical values called 'opcodes' to each of the instructions. When
+  our program is 'assembled' from the program code text, the version of the
+  program that we actually load into memory will use these numeric codes to refer
+  to the CPU instructions in place of the textual names as a numeric value is a
+  more efficient representation, especially as computers only directly understand
+  numbers, whereas text is an abstraction on top of number values.
+
+  We'll make the opcodes numbers starting at 9000 to make the values a bit more
+  distinctive when we see them in the memory viewer. We'll include some extra info
+  about each of the instructions so our simulator user interface can show it
+  alongside the 'disassembled' view of the program code in memory.
+  */
+  instructions: {
+    // this instruction is typically called 'mov', short for 'move', as in 'move
+    // value at *this* address to *that* address', but this naming can be a bit
+    // confusing, because the operation doesn't remove the value at the source
+    // address, as 'move' might seem to imply, so for clarity we'll call it 'copy_to_from' instead.
+    copy_to_from: {
+      opcode: 9000,
+      description: 'set value at address to the value at the given address',
+      operands: [['destination', 'address'], ['source', 'address']],
+      execute(destination, sourceAddress) {
+        const sourceValue = memoryGet(sourceAddress);
+        memorySet(destination, sourceValue);
+      },
+    },
+    copy_to_from_constant: {
+      opcode: 9001,
+      description: 'set value at address to the given constant value',
+      operands: [['destination', 'address'], ['source', 'constant']],
+      execute(address, sourceValue) {
+        memorySet(address, sourceValue);
+      },
+    },
+    copy_to_from_ptr: {
+      opcode: 9002,
+      description: `set value at destination address to the value at the
+  address pointed to by the value at 'source' address`,
+      operands: [['destination', 'address'], ['source', 'pointer']],
+      execute(destinationAddress, sourcePointer) {
+        const sourceAddress = memoryGet(sourcePointer);
+        const sourceValue = memoryGet(sourceAddress);
+        memorySet(destinationAddress, sourceValue);
+      },
+    },
+    copy_into_ptr_from: {
+      opcode: 9003,
+      description: `set value at the address pointed to by the value at
+  'destination' address to the value at the source address`,
+      operands: [['destination', 'pointer'], ['source', 'address']],
+      execute(destinationPointer, sourceAddress) {
+        const destinationAddress = memoryGet(destinationPointer);
+        const sourceValue = memoryGet(sourceAddress);
+        memorySet(destinationAddress, sourceValue);
+      },
+    },
+    copy_address_of_label: {
+      opcode: 9004,
+      description: `set value at destination address to the address of the label
+  given`,
+      operands: [['destination', 'address'], ['source', 'label']],
+      execute(destinationAddress, labelAddress) {
+        memorySet(destinationAddress, labelAddress);
+      },
+    },
+    add: {
+      opcode: 9010,
+      description: `add the value at the 'a' address with the value at the 'b'
+  address and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        const result = a + b;
+        memorySet(resultAddress, result);
+      },
+    },
+    add_constant: {
+      opcode: 9011,
+      description: `add the value at the 'a' address with the constant value 'b' and store
+  the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, b, resultAddress) {
+        const a = memoryGet(aAddress);
+        const result = a + b;
+        memorySet(resultAddress, result);
+      },
+    },
+    subtract: {
+      opcode: 9020,
+      description: `from the value at the 'a' address, subtract the value at the
+  'b' address and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        const result = a - b;
+        memorySet(resultAddress, result);
+      },
+    },
+    subtract_constant: {
+      opcode: 9021,
+      description: `from the value at the 'a' address, subtract the constant value 'b' and
+  store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, b, resultAddress) {
+        const a = memoryGet(aAddress);
+        const result = a - b;
+        memorySet(resultAddress, result);
+      },
+    },
+    multiply: {
+      opcode: 9030,
+      description: `multiply the value at the 'a' address and the value at the 'b'
+  address and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        const result = a * b;
+        memorySet(resultAddress, result);
+      },
+    },
+    multiply_constant: {
+      opcode: 9031,
+      description: `multiply the value at the 'a' address and the constant value 'b' and
+  store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, b, resultAddress) {
+        const a = memoryGet(aAddress);
+        const result = a * b;
+        memorySet(resultAddress, result);
+      },
+    },
+    divide: {
+      opcode: 9040,
+      description: `integer divide the value at the 'a' address by the value at
+  the 'b' address and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        if (b === 0) throw new Error('tried to divide by zero');
+        const result = Math.floor(a / b);
+        memorySet(resultAddress, result);
+      },
+    },
+    divide_constant: {
+      opcode: 9041,
+      description: `integer divide the value at the 'a' address by the constant value 'b'
+  and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, b, resultAddress) {
+        const a = memoryGet(aAddress);
+        if (b === 0) throw new Error('tried to divide by zero');
+        const result = Math.floor(a / b);
+        memorySet(resultAddress, result);
+      },
+    },
+    modulo: {
+      opcode: 9050,
+      description: `get the value at the 'a' address modulo the value at the 'b'
+  address and store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        if (b === 0) throw new Error('tried to modulo by zero');
+        const result = a % b;
+        memorySet(resultAddress, result);
+      },
+    },
+    modulo_constant: {
+      opcode: 9051,
+      description: `get the value at the 'a' address modulo the constant value 'b' and
+  store the result at the 'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, b, resultAddress) {
+        const a = memoryGet(aAddress);
+        const result = a % b;
+        if (b === 0) throw new Error('tried to modulo by zero');
+        memorySet(resultAddress, result);
+      },
+    },
+    compare: {
+      opcode: 9090,
+      description: `compare the value at the 'a' address and the value at the 'b'
+  address and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
+  'result' address`,
+      operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        let result = 0;
+        if (a < b) {
+          result = -1;
+        } else if (a > b) {
+          result = 1;
+        }
+        memorySet(resultAddress, result);
+      },
+    },
+    compare_constant: {
+      opcode: 9091,
+      description: `compare the value at the 'a' address and the constant value
+  'b' and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
+  'result' address`,
+      operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
+      execute(aAddress, bAddress, resultAddress) {
+        const a = memoryGet(aAddress);
+        const b = bAddress;
+        let result = 0;
+        if (a < b) {
+          result = -1;
+        } else if (a > b) {
+          result = 1;
+        }
+        memorySet(resultAddress, result);
+      },
+    },
+    'jump_to':  {
+      opcode: 9100,
+      description: `set the program counter to the address of the label specified,
+  so the program continues from there`,
+      operands: [['destination', 'label']],
+      execute(labelAddress) {
+        cpu.programCounter = labelAddress;
+      },
+    },
+    'branch_if_equal':  {
+      opcode: 9101,
+      description: `if the value at address 'a' is equal to the value at address
+  'b', set the program counter to the address of the label specified, so the
+  program continues from there`,
+      operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
+      execute(aAddress, bAddress, labelAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        if (a === b)  {
+          cpu.programCounter = labelAddress;
+        }
+      },
+    },
+    'branch_if_equal_constant':  {
+      opcode: 9102,
+      description: `if the value at address 'a' is equal to the constant value 'b', set the
+  program counter to the address of the label specified, so the program continues
+  from there`,
+      operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
+      execute(aAddress, b, labelAddress) {
+        const a = memoryGet(aAddress);
+        if (a === b)  {
+          cpu.programCounter = labelAddress;
+        }
+      },
+    },
+    'branch_if_not_equal':  {
+      opcode: 9103,
+      description: `if the value at address 'a' is not equal to the value at
+  address 'b', set the program counter to the address of the label specified, so
+  the program continues from there`,
+      operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
+      execute(aAddress, bAddress, labelAddress) {
+        const a = memoryGet(aAddress);
+        const b = memoryGet(bAddress);
+        if (a !== b)  {
+          cpu.programCounter = labelAddress;
+        }
+      },
+    },
+    'branch_if_not_equal_constant':  {
+      opcode: 9104,
+      description: `if the value at address 'a' is not equal to the constant value 'b', set
+  the program counter to the address of the label specified, so the program
+  continues from there`,
+      operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
+      execute(aAddress, b, labelAddress) {
+        const a = memoryGet(aAddress);
+        if (a !== b)  {
+          cpu.programCounter = labelAddress;
+        }
+      },
+    },
+    'data': {
+      opcode: 9200,
+      description: `operands given will be included in the program when it is
+  compiled at the position that they appear in the code, so you can use a label to
+  get the address of the data and access it`,
+      operands: [],
+      execute() {
+      },
+    }, 
+    'break': {
+      opcode: 9998,
+      description: 'pause program execution, so it must be resumed via simulator UI',
+      operands: [],
+      execute() {
+        cpu.running = false;
+      },
+    },
+    'halt': {
+      opcode: 9999,
+      description: 'end program execution, requiring the simulator to be reset to start again',
+      operands: [],
+      execute() {
+        cpu.running = false;
+        cpu.halted = true;
+      },
     },
   },
-  copy_to_from_constant: {
-    opcode: 9001,
-    description: 'set value at address to the given constant value',
-    operands: [['destination', 'address'], ['source', 'constant']],
-    execute(address, sourceValue) {
-      memorySet(address, sourceValue);
-    },
-  },
-  copy_to_from_ptr: {
-    opcode: 9002,
-    description: `set value at destination address to the value at the
-address pointed to by the value at 'source' address`,
-    operands: [['destination', 'address'], ['source', 'pointer']],
-    execute(destinationAddress, sourcePointer) {
-      const sourceAddress = memoryGet(sourcePointer);
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destinationAddress, sourceValue);
-    },
-  },
-  copy_into_ptr_from: {
-    opcode: 9003,
-    description: `set value at the address pointed to by the value at
-'destination' address to the value at the source address`,
-    operands: [['destination', 'pointer'], ['source', 'address']],
-    execute(destinationPointer, sourceAddress) {
-      const destinationAddress = memoryGet(destinationPointer);
-      const sourceValue = memoryGet(sourceAddress);
-      memorySet(destinationAddress, sourceValue);
-    },
-  },
-  copy_address_of_label: {
-    opcode: 9004,
-    description: `set value at destination address to the address of the label
-given`,
-    operands: [['destination', 'address'], ['source', 'label']],
-    execute(destinationAddress, labelAddress) {
-      memorySet(destinationAddress, labelAddress);
-    },
-  },
-  add: {
-    opcode: 9010,
-    description: `add the value at the 'a' address with the value at the 'b'
-address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a + b;
-      memorySet(resultAddress, result);
-    },
-  },
-  add_constant: {
-    opcode: 9011,
-    description: `add the value at the 'a' address with the constant value 'b' and store
-the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a + b;
-      memorySet(resultAddress, result);
-    },
-  },
-  subtract: {
-    opcode: 9020,
-    description: `from the value at the 'a' address, subtract the value at the
-'b' address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a - b;
-      memorySet(resultAddress, result);
-    },
-  },
-  subtract_constant: {
-    opcode: 9021,
-    description: `from the value at the 'a' address, subtract the constant value 'b' and
-store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a - b;
-      memorySet(resultAddress, result);
-    },
-  },
-  multiply: {
-    opcode: 9030,
-    description: `multiply the value at the 'a' address and the value at the 'b'
-address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      const result = a * b;
-      memorySet(resultAddress, result);
-    },
-  },
-  multiply_constant: {
-    opcode: 9031,
-    description: `multiply the value at the 'a' address and the constant value 'b' and
-store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a * b;
-      memorySet(resultAddress, result);
-    },
-  },
-  divide: {
-    opcode: 9040,
-    description: `integer divide the value at the 'a' address by the value at
-the 'b' address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (b === 0) throw new Error('tried to divide by zero');
-      const result = Math.floor(a / b);
-      memorySet(resultAddress, result);
-    },
-  },
-  divide_constant: {
-    opcode: 9041,
-    description: `integer divide the value at the 'a' address by the constant value 'b'
-and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      if (b === 0) throw new Error('tried to divide by zero');
-      const result = Math.floor(a / b);
-      memorySet(resultAddress, result);
-    },
-  },
-  modulo: {
-    opcode: 9050,
-    description: `get the value at the 'a' address modulo the value at the 'b'
-address and store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (b === 0) throw new Error('tried to modulo by zero');
-      const result = a % b;
-      memorySet(resultAddress, result);
-    },
-  },
-  modulo_constant: {
-    opcode: 9051,
-    description: `get the value at the 'a' address modulo the constant value 'b' and
-store the result at the 'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, b, resultAddress) {
-      const a = memoryGet(aAddress);
-      const result = a % b;
-      if (b === 0) throw new Error('tried to modulo by zero');
-      memorySet(resultAddress, result);
-    },
-  },
-  compare: {
-    opcode: 9090,
-    description: `compare the value at the 'a' address and the value at the 'b'
-address and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
-'result' address`,
-    operands: [['a', 'address'], ['b', 'address'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      let result = 0;
-      if (a < b) {
-        result = -1;
-      } else if (a > b) {
-        result = 1;
-      }
-      memorySet(resultAddress, result);
-    },
-  },
-  compare_constant: {
-    opcode: 9091,
-    description: `compare the value at the 'a' address and the constant value
-'b' and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
-'result' address`,
-    operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-    execute(aAddress, bAddress, resultAddress) {
-      const a = memoryGet(aAddress);
-      const b = bAddress;
-      let result = 0;
-      if (a < b) {
-        result = -1;
-      } else if (a > b) {
-        result = 1;
-      }
-      memorySet(resultAddress, result);
-    },
-  },
-  'jump_to':  {
-    opcode: 9100,
-    description: `set the program counter to the address of the label specified,
-so the program continues from there`,
-    operands: [['destination', 'label']],
-    execute(labelAddress) {
-      programCounter = labelAddress;
-    },
-  },
-  'branch_if_equal':  {
-    opcode: 9101,
-    description: `if the value at address 'a' is equal to the value at address
-'b', set the program counter to the address of the label specified, so the
-program continues from there`,
-    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
-    execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (a === b)  {
-        programCounter = labelAddress;
-      }
-    },
-  },
-  'branch_if_equal_constant':  {
-    opcode: 9102,
-    description: `if the value at address 'a' is equal to the constant value 'b', set the
-program counter to the address of the label specified, so the program continues
-from there`,
-    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
-    execute(aAddress, b, labelAddress) {
-      const a = memoryGet(aAddress);
-      if (a === b)  {
-        programCounter = labelAddress;
-      }
-    },
-  },
-  'branch_if_not_equal':  {
-    opcode: 9103,
-    description: `if the value at address 'a' is not equal to the value at
-address 'b', set the program counter to the address of the label specified, so
-the program continues from there`,
-    operands: [['a', 'address'], ['b', 'address'], ['destination', 'label']],
-    execute(aAddress, bAddress, labelAddress) {
-      const a = memoryGet(aAddress);
-      const b = memoryGet(bAddress);
-      if (a !== b)  {
-        programCounter = labelAddress;
-      }
-    },
-  },
-  'branch_if_not_equal_constant':  {
-    opcode: 9104,
-    description: `if the value at address 'a' is not equal to the constant value 'b', set
-the program counter to the address of the label specified, so the program
-continues from there`,
-    operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
-    execute(aAddress, b, labelAddress) {
-      const a = memoryGet(aAddress);
-      if (a !== b)  {
-        programCounter = labelAddress;
-      }
-    },
-  },
-  'data': {
-    opcode: 9200,
-    description: `operands given will be included in the program when it is
-compiled at the position that they appear in the code, so you can use a label to
-get the address of the data and access it`,
-    operands: [],
-    execute() {
-    },
-  }, 
-  'break': {
-    opcode: 9998,
-    description: 'pause program execution, so it must be resumed via simulator UI',
-    operands: [],
-    execute() {
-      running = false;
-    },
-  },
-  'halt': {
-    opcode: 9999,
-    description: 'end program execution, requiring the simulator to be reset to start again',
-    operands: [],
-    execute() {
-      running = false;
-      halted = true;
-    },
+
+  /*
+  We'll set up a mapping between our instruction names and the numerical values
+  we will turn them into when we assemble the program. It is these numerical
+  values which will be interpreted by our simulated CPU as it runs the program.
+  */
+  instructionsToOpcodes: new Map(),
+  opcodesToInstructions: new Map(),
+  /*
+  Advances through the program by one instruction, getting input from the input
+  devices (keyboard, mouse), executing the instruction, then writing output to the
+  output devices (screen, audio).
+  */
+  step() {
+    updateInputs();
+    const opcode = this.advanceProgramCounter();
+    const instructionName = this.opcodesToInstructions.get(opcode);
+    if (!instructionName) {
+      throw new Error(`Unknown opcode '${opcode}'`);
+    }
+
+    // read as many values from memory as the instruction takes as operands and
+    // execute the instruction with those operands
+    const operands = this.instructions[instructionName].operands.map(() => 
+      this.advanceProgramCounter()
+    );
+    this.instructions[instructionName].execute.apply(null, operands);
   },
 };
 
 /*
-We'll set up a mapping between our instruction names and the numerical values
-we will turn them into when we assemble the program. It is these numerical
-values which will be interpreted by our simulated CPU as it runs the program.
+Init mapping between our instruction names and opcodes
 */
-const instructionsToOpcodes = new Map();
-const opcodesToInstructions = new Map();
-Object.keys(instructions).forEach((instructionName, index) => {
-  const opcode = instructions[instructionName].opcode;
-  instructionsToOpcodes.set(instructionName, opcode);
-  opcodesToInstructions.set(opcode, instructionName);
+Object.keys(cpu.instructions).forEach((instructionName, index) => {
+  const opcode = cpu.instructions[instructionName].opcode;
+  cpu.instructionsToOpcodes.set(instructionName, opcode);
+  cpu.opcodesToInstructions.set(opcode, instructionName);
 });
-
-/*
-Advances through the program by one instruction, getting input from the input
-devices (keyboard, mouse), executing the instruction, then writing output to the
-output devices (screen, audio).
-*/
-function step() {
-  updateInputs();
-  const opcode = advanceProgramCounter();
-  const instructionName = opcodesToInstructions.get(opcode);
-  if (!instructionName) {
-    throw new Error(`Unknown opcode '${opcode}'`);
-  }
-
-  // read as many values from memory as the instruction takes as operands and
-  // execute the instruction with those operands
-  const operands = instructions[instructionName].operands.map(advanceProgramCounter);
-  instructions[instructionName].execute.apply(null, operands);
-}
 
 
 // 3.DISPLAY
@@ -513,22 +528,22 @@ your palette).
 */
 
 const COLOR_PALETTE = {
-  0:  [  0,  0,  0], // Black
-  1:  [255,255,255], // White
-  2:  [255,  0,  0], // Red
-  3:  [  0,255,  0], // Lime 
-  4:  [  0,  0,255], // Blue 
-  5:  [255,255,  0], // Yellow 
-  6:  [  0,255,255], // Cyan/Aqua
-  7:  [255,  0,255], // Magenta/Fuchsia
-  8:  [192,192,192], // Silver 
-  9:  [128,128,128], // Gray 
-  10: [128,  0,  0], // Maroon 
-  11: [128,128,  0], // Olive
-  12: [  0,128,  0], // Green
-  13: [128,  0,128], // Purple 
-  14: [  0,128,128], // Teal 
-  15: [  0,  0,128], // Navy 
+  '0':  [  0,  0,  0], // Black
+  '1':  [255,255,255], // White
+  '2':  [255,  0,  0], // Red
+  '3':  [  0,255,  0], // Lime 
+  '4':  [  0,  0,255], // Blue 
+  '5':  [255,255,  0], // Yellow 
+  '6':  [  0,255,255], // Cyan/Aqua
+  '7':  [255,  0,255], // Magenta/Fuchsia
+  '8':  [192,192,192], // Silver 
+  '9':  [128,128,128], // Gray 
+  '10': [128,  0,  0], // Maroon 
+  '11': [128,128,  0], // Olive
+  '12': [  0,128,  0], // Green
+  '13': [128,  0,128], // Purple 
+  '14': [  0,128,128], // Teal 
+  '15': [  0,  0,128], // Navy 
 };
 
 function getColor(pixelColorId, address) {
@@ -540,6 +555,7 @@ function getColor(pixelColorId, address) {
 }
 
 const canvasCtx = getCanvas().getContext('2d');
+if (canvasCtx == null) throw new Error('expected canvas context');
 const imageData = canvasCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 /*
 Read the pixel values from video memory, look them up in our color palette, and
@@ -569,6 +585,9 @@ function drawScreen() {
 // 4.INPUT
 
 const keysPressed = new Set();
+
+if (!document.body) throw new Error('not ready');
+
 document.body.onkeydown = function(event) {
   keysPressed.add(event.which);
 }
@@ -611,10 +630,10 @@ function updateInputs() {
 // 5.SOUND
 
 const WAVETYPES = {
-  0: 'square',
-  1: 'sawtooth',
-  2: 'triangle',
-  3: 'sine',
+  '0': 'square',
+  '1': 'sawtooth',
+  '2': 'triangle',
+  '3': 'sine',
 };
 
 const MAX_GAIN = 0.15;
@@ -668,7 +687,7 @@ const audioChannels = [
 function updateAudio() {
   audioChannels.forEach(channel => {
     const frequency = (MEMORY[channel.freqAddr] || 0) / 1000;
-    const gain = !running ? 0 : (MEMORY[channel.volAddr] || 0) / 100 * MAX_GAIN;
+    const gain = !cpu.running ? 0 : (MEMORY[channel.volAddr] || 0) / 100 * MAX_GAIN;
     const oscillatorType = WAVETYPES[MEMORY[channel.wavetypeAddr] || 0];
 
     const {state} = channel;
@@ -707,8 +726,8 @@ and operands for that instruction, from each line.
 // we'll keep a map of instructions which take a label as an operand so we
 // know when to substitute an operand for the corresponding label address
 const instructionsLabelOperands = new Map();
-Object.keys(instructions).forEach(name => {
-  const labelOperandIndex = instructions[name].operands.findIndex(operand =>
+Object.keys(cpu.instructions).forEach(name => {
+  const labelOperandIndex = cpu.instructions[name].operands.findIndex(operand =>
     operand[1] === 'label'
   );
   if (labelOperandIndex > -1) {
@@ -720,7 +739,7 @@ function parseProgramText(programText) {
   const programInstructions = [];
   const lines = programText.split('\n');
   for (let line of lines) {
-    const instruction = {name: null, operands: []};
+    const instruction = {name: '', operands: []};
     let tokens = line.replace(/;.*$/, '') // strip comments
       .split(' ');
     for (let token of tokens) {
@@ -771,7 +790,7 @@ function parseProgramText(programText) {
       instruction.name !== 'data' &&
       instruction.name !== 'define'
     ) {
-      const expectedOperands = instructions[instruction.name].operands;
+      const expectedOperands = cpu.instructions[instruction.name].operands;
       if (instruction.operands.length !== expectedOperands.length) {
         throw new Error(`Wrong number of operands for instruction ${instruction.name}
 got ${instruction.operands.length}, expected ${expectedOperands.length}
@@ -834,7 +853,7 @@ function assembleAndLoadProgram(programInstructions) {
     }
 
     // for each instruction, we first write the relevant opcode to memory
-    const opcode = instructionsToOpcodes.get(instruction.name);
+    const opcode = cpu.instructionsToOpcodes.get(instruction.name);
     if (!opcode) {
       throw new Error(`No opcode found for instruction '${instruction.name}'`);
     }
@@ -846,6 +865,7 @@ function assembleAndLoadProgram(programInstructions) {
     // replace labels used as operands with actual memory address
     if (instructionsLabelOperands.has(instruction.name)) {
       const labelOperandIndex = instructionsLabelOperands.get(instruction.name);
+      if (typeof labelOperandIndex !== 'number') throw new Error('expected number');
       const labelName = instruction.operands[labelOperandIndex];
       const labelAddress = labelAddresses[labelName];
       if (!labelAddress) {
@@ -874,7 +894,7 @@ function assembleAndLoadProgram(programInstructions) {
 // 7.SIMULATION CONTROL
 
 function runStop() {
-  if (running) {
+  if (cpu.running) {
     stop();
   } else {
     run();
@@ -882,22 +902,22 @@ function runStop() {
 }
 
 function run() {
-  running = true;
+  cpu.running = true;
   updateUI();
   updateSpeedUI();
   loop();
 }
 
 function stop() {
-  running = false;
+  cpu.running = false;
   updateUI();
   updateSpeedUI();
 }
 
 function stepOnce() {
-  running = true;
-  step();
-  running = false;
+  cpu.running = true;
+  cpu.step();
+  cpu.running = false;
   updateOutputs();
   updateUI();
 }
@@ -906,23 +926,23 @@ let delayBetweenCycles = 0;
 const CYCLES_PER_YIELD = 997;
 function loop() {
   if (delayBetweenCycles === 0) {
-    // running full speed, execute a bunch of instructions before yielding
+    // cpu.running full speed, execute a bunch of instructions before yielding
     // to the JS event loop, to achieve decent 'real time' execution speed
     for (var i = 0; i < CYCLES_PER_YIELD; i++) {
-      if (!running) {
+      if (!cpu.running) {
         stop();
         break;
       }
-      step();
+      cpu.step();
     }
   } else {
     // run only one execution before yielding to the JS event loop so screen
     // and UI changes can be shown, and new mouse and keyboard input taken
-    step();
+    cpu.step();
     updateUI();
   }
   updateOutputs();
-  if (running) {
+  if (cpu.running) {
     setTimeout(loop, delayBetweenCycles);
   }
 }
@@ -949,9 +969,7 @@ function loadProgramAndReset() {
   }
   setLoadedProgramText(programText);
 
-  programCounter = PROGRAM_START;
-  halted = false;
-  running = false;
+  cpu.reset();
   updateOutputs();
   updateProgramMemoryView(MEMORY);
   updateUI();
@@ -1350,29 +1368,58 @@ data -1
 // not really important for understanding how computers work
 
 function $(selector) {
-  return document.querySelector(selector);
+  const el = document.querySelector(selector);
+  if (el == null) throw new Error(`couldn't find selector '${selector}'`);
+  return el;
+}
+
+function $Input(selector) {
+  const el = $(selector);
+  if (el instanceof HTMLInputElement) return el;
+  throw new Error('expected HTMLInputElement');
+}
+function $TextArea(selector) {
+  const el = $(selector);
+  if (el instanceof HTMLTextAreaElement) return el;
+  throw new Error('expected HTMLTextAreaElement');
+}
+function $Button(selector) {
+  const el = $(selector);
+  if (el instanceof HTMLButtonElement) return el;
+  throw new Error('expected HTMLButtonElement');
+}
+function $Canvas(selector) {
+  const el = $(selector);
+  if (el instanceof HTMLCanvasElement) return el;
+  throw new Error('expected HTMLCanvasElement');
+}
+function $Select(selector) {
+  const el = $(selector);
+  if (el instanceof HTMLSelectElement) return el;
+  throw new Error('expected HTMLSelectElement');
 }
 
 let selectedProgram = localStorage.getItem('selectedProgram') || 'RandomPixels';
 
 function initUI() {
+  const programSelectorEl = $Select('#programSelector');
   // init program selector
   Object.keys(PROGRAMS).forEach(programName => {
     const option = document.createElement('option');
     option.value = programName;
     option.textContent = programName;
-    $('#programSelector').append(option);
+    programSelectorEl.append(option);
   });
-  $('#programSelector').value = selectedProgram;
+  programSelectorEl.value = selectedProgram;
   selectProgram();
 }
 
 function getProgramText() {
-  return $('#program').value;
+  return $TextArea('#program').value;
 }
 
 function getCanvas() {
-  return $('#canvas');
+  return $Canvas('#canvasEl');
 }
 
 function initScreen(width, height, pixelScale) {
@@ -1382,6 +1429,7 @@ function initScreen(width, height, pixelScale) {
   }
   Object.assign(getCanvas(), {width, height});
   // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
+  // $FlowFixMe: ignore unknown property '-ms-interpolation-mode'
   Object.assign(getCanvas().style, {
     transformOrigin: 'top left',
     transform: `scale(${pixelScale})`,
@@ -1393,35 +1441,36 @@ function initScreen(width, height, pixelScale) {
 let loadedProgramText = null;
 function setLoadedProgramText(programText) {
   loadedProgramText = programText;
-  $('#loadProgramButton').disabled = true;
+  $Button('#loadProgramButton').disabled = true;
 }
 
 function updateLoadProgramButton() {
-  $('#loadProgramButton').disabled = loadedProgramText === getProgramText();
+  $Button('#loadProgramButton').disabled = loadedProgramText === getProgramText();
 }
 
 function selectProgram() {
-  selectedProgram = $('#programSelector').value;
+  selectedProgram = $Select('#programSelector').value;
   localStorage.setItem('selectedProgram', selectedProgram);
-  $('#program').value =
+  $TextArea('#program').value =
     localStorage.getItem(selectedProgram) || PROGRAMS[selectedProgram] || '';
   updateLoadProgramButton();
 }
 
 function editProgramText() {
   if (selectedProgram.startsWith('Custom')) {
-    localStorage.setItem(selectedProgram, $('#program').value);
+    localStorage.setItem(selectedProgram, $TextArea('#program').value);
   }
   updateLoadProgramButton();
 }
 
 function setSpeed() {
-  delayBetweenCycles = -parseInt($('#speed').value, 10);
+  delayBetweenCycles = -parseInt($Input('#speed').value, 10);
   updateSpeedUI();
 }
 
 function setFullspeed() {
-  if ($('#fullspeed').checked) {
+  const fullspeedEl = $Input('#fullspeed');
+  if (fullspeedEl && fullspeedEl.checked) {
     delayBetweenCycles = 0;
   } else {
     delayBetweenCycles = 1;
@@ -1431,31 +1480,33 @@ function setFullspeed() {
 
 function updateSpeedUI() {
   const fullspeed = delayBetweenCycles === 0;
-  const runningAtFullspeed = running && fullspeed;
-  $('#fullspeed').checked = fullspeed;
-  $('#speed').value = -delayBetweenCycles;
+  const runningAtFullspeed = cpu.running && fullspeed;
+  $Input('#fullspeed').checked = fullspeed;
+  $Input('#speed').value = String(-delayBetweenCycles);
   $('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
   $('#debuggerMessageArea').textContent = runningAtFullspeed ?
-    'debug UI disabled when running at full speed' : '';
+    'debug UI disabled when cpu.running at full speed' : '';
 }
 
 function updateUI() {
-  $('#programCounter').value = programCounter;
-  if (halted) {
+  $Input('#programCounter').value = String(cpu.programCounter);
+  if (cpu.halted) {
     $('#running').textContent = 'halted';
-    $('#stepButton').disabled = true;
-    $('#runButton').disabled = true;
+    $Button('#stepButton').disabled = true;
+    $Button('#runButton').disabled = true;
   } else {
-    $('#running').textContent = running ? 'running' : 'paused';
-    $('#stepButton').disabled = false;
-    $('#runButton').disabled = false;
+    $('#running').textContent = cpu.running ? 'running' : 'paused';
+    $Button('#stepButton').disabled = false;
+    $Button('#runButton').disabled = false;
   }
   updateWorkingMemoryView(MEMORY);
   updateInputMemoryView(MEMORY);
   updateVideoMemoryView(MEMORY);
   updateAudioMemoryView(MEMORY);
-  if (delayBetweenCycles > 300 || !running) {
-    scrollToProgramLine(Math.max(0, programCounter - PROGRAM_MEMORY_START - 3));
+  if (delayBetweenCycles > 300 || !cpu.running) {
+    if (typeof scrollToProgramLine == 'function') {
+      scrollToProgramLine(Math.max(0, cpu.programCounter - PROGRAM_MEMORY_START - 3));
+    }
   }
 }
 
@@ -1464,17 +1515,17 @@ function updateWorkingMemoryView(memory) {
   for (var i = WORKING_MEMORY_START; i < WORKING_MEMORY_END; i++) {
     lines.push(`${i}: ${memory[i]}`);
   }
-  $('#workingMemoryView').textContent = lines.join('\n');
+  $TextArea('#workingMemoryView').textContent = lines.join('\n');
 }
 
 let scrollToProgramLine = null
 function updateProgramMemoryView(memory) {
   const lines = [];
   for (var i = PROGRAM_MEMORY_START; i < PROGRAM_MEMORY_END; i++) {
-    const instruction = opcodesToInstructions.get(memory[i]);
+    const instruction = cpu.opcodesToInstructions.get(memory[i]);
     lines.push(`${padRight(i, 4)}: ${padRight(memory[i], 8)} ${instruction || ''}`);
     if (instruction) {
-      const operands = instructions[instruction].operands;
+      const operands = cpu.instructions[instruction].operands;
       for (var j = 0; j < operands.length; j++) {
         lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(memory[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
       }
@@ -1491,7 +1542,7 @@ function updateProgramMemoryView(memory) {
     (start, end) => (
       lines.slice(start, end)
         .map((l, i) => {
-          const current = PROGRAM_MEMORY_START + start + i === programCounter;
+          const current = PROGRAM_MEMORY_START + start + i === cpu.programCounter;
           return `
 <pre
   class="tablerow"
@@ -1512,7 +1563,7 @@ function updateProgramMemoryView(memory) {
 }
 
 function updateInputMemoryView(memory) {
-  $('#inputMemoryView').textContent =
+  $TextArea('#inputMemoryView').textContent =
     `${KEYCODE_0_ADDRESS}: ${padRight(memory[KEYCODE_0_ADDRESS], 8)} keycode 0
 ${KEYCODE_1_ADDRESS}: ${padRight(memory[KEYCODE_1_ADDRESS], 8)} keycode 1
 ${KEYCODE_2_ADDRESS}: ${padRight(memory[KEYCODE_2_ADDRESS], 8)} keycode 2
@@ -1528,11 +1579,11 @@ function updateVideoMemoryView(memory) {
   for (var i = VIDEO_MEMORY_START; i < VIDEO_MEMORY_END; i++) {
     lines.push(`${i}: ${memory[i]}`);
   }
-  $('#videoMemoryView').textContent = lines.join('\n');
+  $TextArea('#videoMemoryView').textContent = lines.join('\n');
 }
 
 function updateAudioMemoryView(memory) {
-  $('#audioMemoryView').textContent =
+  $TextArea('#audioMemoryView').textContent =
 `${AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(memory[AUDIO_CH1_WAVETYPE_ADDRESS], 8)} AUDIO_CH1_WAVETYPE
 ${AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(memory[AUDIO_CH1_FREQUENCY_ADDRESS], 8)} AUDIO_CH1_FREQUENCY
 ${AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(memory[AUDIO_CH1_VOLUME_ADDRESS], 8)} AUDIO_CH1_VOLUME
