@@ -748,173 +748,183 @@ splitting those lines into tokens (words), which gives us to an instruction name
 and operands for that instruction, from each line.
 */
 
-// we'll keep a map of instructions which take a label as an operand so we
-// know when to substitute an operand for the corresponding label address
-const instructionsLabelOperands = new Map();
-Object.keys(cpu.instructions).forEach(name => {
-  const labelOperandIndex = cpu.instructions[name].operands.findIndex(operand =>
-    operand[1] === 'label'
-  );
-  if (labelOperandIndex > -1) {
-    instructionsLabelOperands.set(name, labelOperandIndex);
-  }
-});
+const assembler = {
+  // we'll keep a map of instructions which take a label as an operand so we
+  // know when to substitute an operand for the corresponding label address
+  instructionsLabelOperands: new Map(),
 
-function parseProgramText(programText) {
-  const programInstructions = [];
-  const lines = programText.split('\n');
-  for (let line of lines) {
-    const instruction = {name: '', operands: []};
-    let tokens = line.replace(/;.*$/, '') // strip comments
-      .split(' ');
-    for (let token of tokens) {
-      // skip empty tokens
-      if (token == null || token == "") {
-        continue;
+  initInstructionsLabelOperands() {
+    Object.keys(cpu.instructions).forEach(name => {
+      const labelOperandIndex = cpu.instructions[name].operands.findIndex(operand =>
+        operand[1] === 'label'
+      );
+      if (labelOperandIndex > -1) {
+        this.instructionsLabelOperands.set(name, labelOperandIndex);
       }
-      // first token
-      if (!instruction.name) {
-        // special case for labels
-        if (token.endsWith(':')) {
-          instruction.name = 'label';
-          instruction.operands.push(token.slice(0, token.length - 1));
-          break;
-        }
+    });
+  },
 
-        instruction.name = token; // instruction name token
-      } else {
-        // handle text operands
-        if (
-          (
-            // define name
-            instruction.name === 'define' &&
-            instruction.operands.length === 0
-          ) || (
-            // label used as operand
-            instructionsLabelOperands.get(instruction.name) === instruction.operands.length
-          )
-        ) {
-          instruction.operands.push(token);
+  parseProgramText(programText) {
+    const programInstructions = [];
+    const lines = programText.split('\n');
+    for (let line of lines) {
+      const instruction = {name: '', operands: []};
+      let tokens = line.replace(/;.*$/, '') // strip comments
+        .split(' ');
+      for (let token of tokens) {
+        // skip empty tokens
+        if (token == null || token == "") {
           continue;
         }
+        // first token
+        if (!instruction.name) {
+          // special case for labels
+          if (token.endsWith(':')) {
+            instruction.name = 'label';
+            instruction.operands.push(token.slice(0, token.length - 1));
+            break;
+          }
 
-        // try to parse number operands
-        const number = parseInt(token, 10);
-        if (Number.isNaN(number)) {
-          instruction.operands.push(token);
+          instruction.name = token; // instruction name token
         } else {
-          instruction.operands.push(number);
+          // handle text operands
+          if (
+            (
+              // define name
+              instruction.name === 'define' &&
+              instruction.operands.length === 0
+            ) || (
+              // label used as operand
+              this.instructionsLabelOperands.get(instruction.name) === instruction.operands.length
+            )
+          ) {
+            instruction.operands.push(token);
+            continue;
+          }
+
+          // try to parse number operands
+          const number = parseInt(token, 10);
+          if (Number.isNaN(number)) {
+            instruction.operands.push(token);
+          } else {
+            instruction.operands.push(number);
+          }
         }
       }
-    }
 
-    // validate number of operands given
-    if (
-      instruction.name &&
-      instruction.name !== 'label' &&
-      instruction.name !== 'data' &&
-      instruction.name !== 'define'
-    ) {
-      const expectedOperands = cpu.instructions[instruction.name].operands;
-      if (instruction.operands.length !== expectedOperands.length) {
-        throw new Error(`Wrong number of operands for instruction ${instruction.name}
-got ${instruction.operands.length}, expected ${expectedOperands.length}
-at line '${line}'`
-        );
-      }
-    }
-
-    //  if instruction was found on this line, add it to the program
-    if (instruction.name) {
-      programInstructions.push(instruction);
-    }
-  }
-  programInstructions.push({name: 'halt', operands: []});
-  return programInstructions;
-}
-
-/*
-Having parsed our program text into an array of objects containing instruction
-name and the operands to the instruction, we need to turn those objects into
-numeric values we can store in the computer's memory, and load them in there.
-*/
-function assembleAndLoadProgram(programInstructions) {
-  // 'label' is a special case – it's not really an instruction which the CPU
-  // understands. Instead, it's a marker for the location of the next
-  // instruction, which we can substitute for the actual location once we know
-  // the memory locations in the assembled program which the labels refer to.
-  const labelAddresses = {};
-  let labelAddress = memory.PROGRAM_START;
-  for (let instruction of programInstructions) {
-    if (instruction.name === 'label') {
-      const labelName = instruction.operands[0];
-      labelAddresses[labelName] = labelAddress;
-    } else if (instruction.name === 'define') {
-      continue;
-    } else {
-      // advance labelAddress by the length of the instruction and its operands
-      labelAddress += 1 + instruction.operands.length;
-    }
-  }
-
-  const defines = {};
-
-  // load instructions and operands into memory
-  let loadingAddress = memory.PROGRAM_START;
-  for (let instruction of programInstructions) {
-    if (instruction.name === 'label') {
-      continue;
-    }
-    if (instruction.name === 'define') {
-      defines[instruction.operands[0]] = instruction.operands[1];
-      continue;
-    }
-
-    if (instruction.name === 'data') {
-      for (var i = 0; i < instruction.operands.length; i++) {
-        memory.ram[loadingAddress++] = instruction.operands[i];
-      }
-      continue;
-    }
-
-    // for each instruction, we first write the relevant opcode to memory
-    const opcode = cpu.instructionsToOpcodes.get(instruction.name);
-    if (!opcode) {
-      throw new Error(`No opcode found for instruction '${instruction.name}'`);
-    }
-    memory.ram[loadingAddress++] = opcode;
-    
-    // then, we write the operands for instruction to memory
-    const operands = instruction.operands.slice(0);
-
-    // replace labels used as operands with actual memory address
-    if (instructionsLabelOperands.has(instruction.name)) {
-      const labelOperandIndex = instructionsLabelOperands.get(instruction.name);
-      if (typeof labelOperandIndex !== 'number') throw new Error('expected number');
-      const labelName = instruction.operands[labelOperandIndex];
-      const labelAddress = labelAddresses[labelName];
-      if (!labelAddress) {
-        throw new Error(`unknown label '${labelName}'`);
-      }
-      operands[labelOperandIndex] = labelAddress;
-    }
-
-    for (var i = 0; i < operands.length; i++) {
-      let value = null;
-      if (typeof operands[i] === 'string') {
-        if (operands[i] in defines) {
-          value = defines[operands[i]];
-        } else {
-          throw new Error(`'${operands[i]}' not defined`);
+      // validate number of operands given
+      if (
+        instruction.name &&
+        instruction.name !== 'label' &&
+        instruction.name !== 'data' &&
+        instruction.name !== 'define'
+      ) {
+        const expectedOperands = cpu.instructions[instruction.name].operands;
+        if (instruction.operands.length !== expectedOperands.length) {
+          throw new Error(`Wrong number of operands for instruction ${instruction.name}
+  got ${instruction.operands.length}, expected ${expectedOperands.length}
+  at line '${line}'`
+          );
         }
+      }
+
+      //  if instruction was found on this line, add it to the program
+      if (instruction.name) {
+        programInstructions.push(instruction);
+      }
+    }
+    programInstructions.push({name: 'halt', operands: []});
+    return programInstructions;
+  },
+
+  /*
+  Having parsed our program text into an array of objects containing instruction
+  name and the operands to the instruction, we need to turn those objects into
+  numeric values we can store in the computer's memory, and load them in there.
+  */
+  assembleAndLoadProgram(programInstructions) {
+    // 'label' is a special case – it's not really an instruction which the CPU
+    // understands. Instead, it's a marker for the location of the next
+    // instruction, which we can substitute for the actual location once we know
+    // the memory locations in the assembled program which the labels refer to.
+    const labelAddresses = {};
+    let labelAddress = memory.PROGRAM_START;
+    for (let instruction of programInstructions) {
+      if (instruction.name === 'label') {
+        const labelName = instruction.operands[0];
+        labelAddresses[labelName] = labelAddress;
+      } else if (instruction.name === 'define') {
+        continue;
       } else {
-        value = operands[i];
+        // advance labelAddress by the length of the instruction and its operands
+        labelAddress += 1 + instruction.operands.length;
+      }
+    }
+
+    const defines = {};
+
+    // load instructions and operands into memory
+    let loadingAddress = memory.PROGRAM_START;
+    for (let instruction of programInstructions) {
+      if (instruction.name === 'label') {
+        continue;
+      }
+      if (instruction.name === 'define') {
+        defines[instruction.operands[0]] = instruction.operands[1];
+        continue;
       }
 
-      memory.ram[loadingAddress++] = value;
+      if (instruction.name === 'data') {
+        for (var i = 0; i < instruction.operands.length; i++) {
+          memory.ram[loadingAddress++] = instruction.operands[i];
+        }
+        continue;
+      }
+
+      // for each instruction, we first write the relevant opcode to memory
+      const opcode = cpu.instructionsToOpcodes.get(instruction.name);
+      if (!opcode) {
+        throw new Error(`No opcode found for instruction '${instruction.name}'`);
+      }
+      memory.ram[loadingAddress++] = opcode;
+      
+      // then, we write the operands for instruction to memory
+      const operands = instruction.operands.slice(0);
+
+      // replace labels used as operands with actual memory address
+      if (this.instructionsLabelOperands.has(instruction.name)) {
+        const labelOperandIndex = this.instructionsLabelOperands.get(instruction.name);
+        if (typeof labelOperandIndex !== 'number') throw new Error('expected number');
+        const labelName = instruction.operands[labelOperandIndex];
+        const labelAddress = labelAddresses[labelName];
+        if (!labelAddress) {
+          throw new Error(`unknown label '${labelName}'`);
+        }
+        operands[labelOperandIndex] = labelAddress;
+      }
+
+      for (var i = 0; i < operands.length; i++) {
+        let value = null;
+        if (typeof operands[i] === 'string') {
+          if (operands[i] in defines) {
+            value = defines[operands[i]];
+          } else {
+            throw new Error(`'${operands[i]}' not defined`);
+          }
+        } else {
+          value = operands[i];
+        }
+
+        memory.ram[loadingAddress++] = value;
+      }
     }
+  },
+
+  init() {
+    this.initInstructionsLabelOperands();
   }
-}
+};
+assembler.init();
 
 // 7.SIMULATION CONTROL
 
@@ -987,7 +997,7 @@ function loadProgramAndReset() {
 
   const programText = getProgramText();
   try {
-    assembleAndLoadProgram(parseProgramText(programText));
+    assembler.assembleAndLoadProgram(assembler.parseProgramText(programText));
   } catch (err) {
     alert(err.stack);
     console.error(err.stack)
