@@ -557,8 +557,8 @@ const Display = {
     return color;
   },
 
-  imageData: null,
-  canvasCtx: null,
+  imageData: (null/*: ?ImageData */),
+  canvasCtx: (null/*: ?CanvasRenderingContext2D */),
 
   /*
   Read the pixel values from video memory, look them up in our color palette, and
@@ -570,7 +570,7 @@ const Display = {
   (full opacity) for every pixel.
   */
   drawScreen() {
-    const imageData = this.getImageData();
+    const imageData = notNull(this.imageData);
     const videoMemoryLength = Memory.VIDEO_MEMORY_END - Memory.VIDEO_MEMORY_START;
     const pixelsRGBA = imageData.data;
     for (var i = 0; i < videoMemoryLength; i++) {
@@ -582,23 +582,14 @@ const Display = {
       pixelsRGBA[i * 4 + 3] = 255; // full opacity
     }
 
-    const canvasCtx = this.getCanvasContext();
+    const canvasCtx = notNull(this.canvasCtx);
     canvasCtx.putImageData(imageData, 0, 0);
-  },
-
-  getImageData() /*: ImageData */ {
-    return (this.imageData/*: any */);
-  },
-
-  getCanvasContext() /*: CanvasRenderingContext2D */ {
-    return (this.canvasCtx/*: any */);
   },
 
   init() {
     const canvasCtx = notNull(SimulatorUI.getCanvas().getContext('2d'));
-    const imageData = canvasCtx.createImageData(Display.SCREEN_WIDTH, Display.SCREEN_HEIGHT);
-    this.imageData = (imageData/*: any */);
-    this.canvasCtx = (canvasCtx/*: any */);
+    this.canvasCtx = canvasCtx;
+    this.imageData = canvasCtx.createImageData(Display.SCREEN_WIDTH, Display.SCREEN_HEIGHT);
   },
 };
 
@@ -1692,6 +1683,7 @@ function padRight(input, length) {
   return padded;
 }
 
+/*:: declare function notNull<T>(val: ?T): T; */
 function notNull(val) {
   if (val != null) return val;
   throw new Error('unexpected null');
