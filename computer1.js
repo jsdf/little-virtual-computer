@@ -1639,13 +1639,14 @@ const SimulatorUI = {
   updateInputMemoryView() {
     UI.$TextArea('#inputMemoryView').textContent =
       `${Memory.KEYCODE_0_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_0_ADDRESS], 8)} keycode 0
-  ${Memory.KEYCODE_1_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_1_ADDRESS], 8)} keycode 1
-  ${Memory.KEYCODE_2_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_2_ADDRESS], 8)} keycode 2
-  ${Memory.MOUSE_X_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_X_ADDRESS], 8)} mouse x
-  ${Memory.MOUSE_Y_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_Y_ADDRESS], 8)} mouse y
-  ${Memory.MOUSE_PIXEL_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
-  ${Memory.MOUSE_BUTTON_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
-  ${Memory.RANDOM_NUMBER_ADDRESS}: ${padRight(Memory.ram[Memory.RANDOM_NUMBER_ADDRESS], 8)} random number`;
+${Memory.KEYCODE_1_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_1_ADDRESS], 8)} keycode 1
+${Memory.KEYCODE_2_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_2_ADDRESS], 8)} keycode 2
+${Memory.MOUSE_X_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_X_ADDRESS], 8)} mouse x
+${Memory.MOUSE_Y_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_Y_ADDRESS], 8)} mouse y
+${Memory.MOUSE_PIXEL_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_PIXEL_ADDRESS], 8)} mouse pixel
+${Memory.MOUSE_BUTTON_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_BUTTON_ADDRESS], 8)} mouse button
+${Memory.RANDOM_NUMBER_ADDRESS}: ${padRight(Memory.ram[Memory.RANDOM_NUMBER_ADDRESS], 8)} random number
+${Memory.CURRENT_TIME_ADDRESS}: ${padRight(Memory.ram[Memory.CURRENT_TIME_ADDRESS], 8)} current time`;
   },
 
   updateVideoMemoryView() {
@@ -1659,14 +1660,14 @@ const SimulatorUI = {
   updateAudioMemoryView() {
     UI.$TextArea('#audioMemoryView').textContent =
   `${Memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
-  ${Memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
-  ${Memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
-  ${Memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
-  ${Memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
-  ${Memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
-  ${Memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
-  ${Memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
-  ${Memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
+${Memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
+${Memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
+${Memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
+${Memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
+${Memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
+${Memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
+${Memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
+${Memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
   },
 }
 

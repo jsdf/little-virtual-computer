@@ -33,6 +33,10 @@
       margin: 0;
     }
   </style>
+  <div style="background-color: #eee;padding: 1em;margin: 1em 0;font-size: 1.3em">
+    <h1 style="margin: 0.2em 0; font-weight: normal">Little Virtual Computer</h1>
+    This is a simple simulated computer. You can read the source code <a href="https://github.com/jsdf/little-virtual-computer/blob/master/computer1.js">here</a>. Click 'run/pause' to make it go, or load a different program with the program selector in the bottom left.
+  </div>
   <div style="display: flex;">
     <div style="width: 620px">
       <div style="width: 600px; height: 600px">
@@ -50,7 +54,7 @@
     </div>
     <div style="flex: 1">
       <div style="height: 30px">
-        <button id="runButton" onclick="Simulation.runStop()">run/stop</button>
+        <button id="runButton" onclick="Simulation.runStop()">run/pause</button>
         <button id="stepButton" onclick="Simulation.stepOnce()">step</button>
         <button onclick="Simulation.loadProgramAndReset()">reset</button>
         <span id="running"></span>
@@ -66,7 +70,7 @@
         program memory (slots 1000 - 1999):
         <div id="programMemoryView">
         </div>
-        input memory (slots 2000 - 2004):
+        input memory (slots 2000 - 2051):
         <textarea id="inputMemoryView" readonly rows="8" cols="40">
         </textarea>
         video memory (slots 2100 - 2999):
