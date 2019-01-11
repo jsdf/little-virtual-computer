@@ -27,9 +27,9 @@ const Memory = {
   values are usually shown as hexadecimal (base-16) form, due to the fact that
   hexadecimal is a concise alternative to binary, which 'lines up' nicely with
   binary: a 1 digit hexadecimal number can represent exactly all of the values
-  which a 4 digit binary number ca. However, we are going to represent addresses
-  and values as decimal (base-10) numbers, so there's one less thing to know about
-  at this point.
+  which a 4 digit binary number can. However, we are going to represent addresses
+  and values as base-10 numbers (the kind you're used to), so there's one less
+  thing you need know about at this point.
   */
   ram: [],
 
