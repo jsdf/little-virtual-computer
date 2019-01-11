@@ -367,9 +367,8 @@ const CPU = {
   'b' and store the result (-1 for a < b, 0 for a == b, 1 for a > b) at the
   'result' address`,
       operands: [['a', 'address'], ['b', 'constant'], ['result', 'address']],
-      execute(aAddress, bAddress, resultAddress) {
+      execute(aAddress, b, resultAddress) {
         const a = Memory.get(aAddress);
-        const b = bAddress;
         let result = 0;
         if (a < b) {
           result = -1;
