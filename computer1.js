@@ -106,7 +106,7 @@ const Memory = {
       throw new Error('tried to read from an invalid memory address');
     }
     return this.ram[address];
-  },
+  }
 };
 
 // 2.CPU
@@ -183,7 +183,7 @@ const CPU = {
       execute(destination, sourceAddress) {
         const sourceValue = Memory.get(sourceAddress);
         Memory.set(destination, sourceValue);
-      },
+      }
     },
     copy_to_from_constant: {
       opcode: 9001,
@@ -191,7 +191,7 @@ const CPU = {
       operands: [['destination', 'address'], ['source', 'constant']],
       execute(address, sourceValue) {
         Memory.set(address, sourceValue);
-      },
+      }
     },
     copy_to_from_ptr: {
       opcode: 9002,
@@ -202,7 +202,7 @@ const CPU = {
         const sourceAddress = Memory.get(sourcePointer);
         const sourceValue = Memory.get(sourceAddress);
         Memory.set(destinationAddress, sourceValue);
-      },
+      }
     },
     copy_into_ptr_from: {
       opcode: 9003,
@@ -213,7 +213,7 @@ const CPU = {
         const destinationAddress = Memory.get(destinationPointer);
         const sourceValue = Memory.get(sourceAddress);
         Memory.set(destinationAddress, sourceValue);
-      },
+      }
     },
     copy_address_of_label: {
       opcode: 9004,
@@ -222,7 +222,7 @@ const CPU = {
       operands: [['destination', 'address'], ['source', 'label']],
       execute(destinationAddress, labelAddress) {
         Memory.set(destinationAddress, labelAddress);
-      },
+      }
     },
     add: {
       opcode: 9010,
@@ -234,7 +234,7 @@ const CPU = {
         const b = Memory.get(bAddress);
         const result = a + b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     add_constant: {
       opcode: 9011,
@@ -245,7 +245,7 @@ const CPU = {
         const a = Memory.get(aAddress);
         const result = a + b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     subtract: {
       opcode: 9020,
@@ -257,7 +257,7 @@ const CPU = {
         const b = Memory.get(bAddress);
         const result = a - b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     subtract_constant: {
       opcode: 9021,
@@ -268,7 +268,7 @@ const CPU = {
         const a = Memory.get(aAddress);
         const result = a - b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     multiply: {
       opcode: 9030,
@@ -280,7 +280,7 @@ const CPU = {
         const b = Memory.get(bAddress);
         const result = a * b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     multiply_constant: {
       opcode: 9031,
@@ -291,7 +291,7 @@ const CPU = {
         const a = Memory.get(aAddress);
         const result = a * b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     divide: {
       opcode: 9040,
@@ -304,7 +304,7 @@ const CPU = {
         if (b === 0) throw new Error('tried to divide by zero');
         const result = Math.floor(a / b);
         Memory.set(resultAddress, result);
-      },
+      }
     },
     divide_constant: {
       opcode: 9041,
@@ -316,7 +316,7 @@ const CPU = {
         if (b === 0) throw new Error('tried to divide by zero');
         const result = Math.floor(a / b);
         Memory.set(resultAddress, result);
-      },
+      }
     },
     modulo: {
       opcode: 9050,
@@ -329,7 +329,7 @@ const CPU = {
         if (b === 0) throw new Error('tried to modulo by zero');
         const result = a % b;
         Memory.set(resultAddress, result);
-      },
+      }
     },
     modulo_constant: {
       opcode: 9051,
@@ -341,7 +341,7 @@ const CPU = {
         const result = a % b;
         if (b === 0) throw new Error('tried to modulo by zero');
         Memory.set(resultAddress, result);
-      },
+      }
     },
     compare: {
       opcode: 9090,
@@ -359,7 +359,7 @@ const CPU = {
           result = 1;
         }
         Memory.set(resultAddress, result);
-      },
+      }
     },
     compare_constant: {
       opcode: 9091,
@@ -377,18 +377,18 @@ const CPU = {
           result = 1;
         }
         Memory.set(resultAddress, result);
-      },
+      }
     },
-    'jump_to':  {
+    jump_to: {
       opcode: 9100,
       description: `set the program counter to the address of the label specified,
   so the program continues from there`,
       operands: [['destination', 'label']],
       execute(labelAddress) {
         CPU.programCounter = labelAddress;
-      },
+      }
     },
-    'branch_if_equal':  {
+    branch_if_equal: {
       opcode: 9101,
       description: `if the value at address 'a' is equal to the value at address
   'b', set the program counter to the address of the label specified, so the
@@ -397,12 +397,12 @@ const CPU = {
       execute(aAddress, bAddress, labelAddress) {
         const a = Memory.get(aAddress);
         const b = Memory.get(bAddress);
-        if (a === b)  {
+        if (a === b) {
           CPU.programCounter = labelAddress;
         }
-      },
+      }
     },
-    'branch_if_equal_constant':  {
+    branch_if_equal_constant: {
       opcode: 9102,
       description: `if the value at address 'a' is equal to the constant value 'b', set the
   program counter to the address of the label specified, so the program continues
@@ -410,12 +410,12 @@ const CPU = {
       operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
       execute(aAddress, b, labelAddress) {
         const a = Memory.get(aAddress);
-        if (a === b)  {
+        if (a === b) {
           CPU.programCounter = labelAddress;
         }
-      },
+      }
     },
-    'branch_if_not_equal':  {
+    branch_if_not_equal: {
       opcode: 9103,
       description: `if the value at address 'a' is not equal to the value at
   address 'b', set the program counter to the address of the label specified, so
@@ -424,12 +424,12 @@ const CPU = {
       execute(aAddress, bAddress, labelAddress) {
         const a = Memory.get(aAddress);
         const b = Memory.get(bAddress);
-        if (a !== b)  {
+        if (a !== b) {
           CPU.programCounter = labelAddress;
         }
-      },
+      }
     },
-    'branch_if_not_equal_constant':  {
+    branch_if_not_equal_constant: {
       opcode: 9104,
       description: `if the value at address 'a' is not equal to the constant value 'b', set
   the program counter to the address of the label specified, so the program
@@ -437,37 +437,36 @@ const CPU = {
       operands: [['a', 'address'], ['b', 'constant'], ['destination', 'label']],
       execute(aAddress, b, labelAddress) {
         const a = Memory.get(aAddress);
-        if (a !== b)  {
+        if (a !== b) {
           CPU.programCounter = labelAddress;
         }
-      },
+      }
     },
-    'data': {
+    data: {
       opcode: 9200,
       description: `operands given will be included in the program when it is
   compiled at the position that they appear in the code, so you can use a label to
   get the address of the data and access it`,
       operands: [],
-      execute() {
-      },
-    }, 
-    'break': {
+      execute() {}
+    },
+    break: {
       opcode: 9998,
       description: 'pause program execution, so it must be resumed via simulator UI',
       operands: [],
       execute() {
         CPU.running = false;
-      },
+      }
     },
-    'halt': {
+    halt: {
       opcode: 9999,
       description: 'end program execution, requiring the simulator to be reset to start again',
       operands: [],
       execute() {
         CPU.running = false;
         CPU.halted = true;
-      },
-    },
+      }
+    }
   },
 
   /*
@@ -493,9 +492,7 @@ const CPU = {
 
     // read as many values from memory as the instruction takes as operands and
     // execute the instruction with those operands
-    const operands = this.instructions[instructionName].operands.map(() => 
-      this.advanceProgramCounter()
-    );
+    const operands = this.instructions[instructionName].operands.map(() => this.advanceProgramCounter());
     this.instructions[instructionName].execute.apply(null, operands);
   },
 
@@ -506,7 +503,7 @@ const CPU = {
       this.instructionsToOpcodes.set(instructionName, opcode);
       this.opcodesToInstructions.set(opcode, instructionName);
     });
-  },
+  }
 };
 
 // 3.DISPLAY
@@ -533,22 +530,22 @@ const Display = {
   */
 
   COLOR_PALETTE: {
-    '0':  [  0,  0,  0], // Black
-    '1':  [255,255,255], // White
-    '2':  [255,  0,  0], // Red
-    '3':  [  0,255,  0], // Lime 
-    '4':  [  0,  0,255], // Blue 
-    '5':  [255,255,  0], // Yellow 
-    '6':  [  0,255,255], // Cyan/Aqua
-    '7':  [255,  0,255], // Magenta/Fuchsia
-    '8':  [192,192,192], // Silver 
-    '9':  [128,128,128], // Gray 
-    '10': [128,  0,  0], // Maroon 
-    '11': [128,128,  0], // Olive
-    '12': [  0,128,  0], // Green
-    '13': [128,  0,128], // Purple 
-    '14': [  0,128,128], // Teal 
-    '15': [  0,  0,128], // Navy 
+    '0': [0, 0, 0], // Black
+    '1': [255, 255, 255], // White
+    '2': [255, 0, 0], // Red
+    '3': [0, 255, 0], // Lime
+    '4': [0, 0, 255], // Blue
+    '5': [255, 255, 0], // Yellow
+    '6': [0, 255, 255], // Cyan/Aqua
+    '7': [255, 0, 255], // Magenta/Fuchsia
+    '8': [192, 192, 192], // Silver
+    '9': [128, 128, 128], // Gray
+    '10': [128, 0, 0], // Maroon
+    '11': [128, 128, 0], // Olive
+    '12': [0, 128, 0], // Green
+    '13': [128, 0, 128], // Purple
+    '14': [0, 128, 128], // Teal
+    '15': [0, 0, 128] // Navy
   },
 
   getColor(pixelColorId, address) {
@@ -559,8 +556,8 @@ const Display = {
     return color;
   },
 
-  imageData: (null/*: ?ImageData */),
-  canvasCtx: (null/*: ?CanvasRenderingContext2D */),
+  imageData: (null /*: ?ImageData */),
+  canvasCtx: (null /*: ?CanvasRenderingContext2D */),
 
   /*
   Read the pixel values from video memory, look them up in our color palette, and
@@ -592,7 +589,7 @@ const Display = {
     const canvasCtx = notNull(SimulatorUI.getCanvas().getContext('2d'));
     this.canvasCtx = canvasCtx;
     this.imageData = canvasCtx.createImageData(Display.SCREEN_WIDTH, Display.SCREEN_HEIGHT);
-  },
+  }
 };
 
 // 4.INPUT
@@ -615,14 +612,14 @@ const Input = {
   init() {
     if (!document.body) throw new Error('DOM not ready');
 
-    document.body.onkeydown = (event) => {
+    document.body.onkeydown = event => {
       this.keysPressed.add(event.which);
     };
-    document.body.onkeyup = (event) => {
+    document.body.onkeyup = event => {
       this.keysPressed.delete(event.which);
     };
 
-    document.body.onmousedown = () => { 
+    document.body.onmousedown = () => {
       this.mouseDown = true;
     };
     document.body.onmouseup = () => {
@@ -631,7 +628,7 @@ const Input = {
 
     const screenPageTop = SimulatorUI.getCanvas().getBoundingClientRect().top + window.scrollY;
     const screenPageLeft = SimulatorUI.getCanvas().getBoundingClientRect().left + window.scrollX;
-    SimulatorUI.getCanvas().onmousemove = (event) => {
+    SimulatorUI.getCanvas().onmousemove = event => {
       this.mouseX = Math.floor((event.pageX - screenPageTop) / Display.SCREEN_PIXEL_SCALE);
       this.mouseY = Math.floor((event.pageY - screenPageLeft) / Display.SCREEN_PIXEL_SCALE);
     };
@@ -646,25 +643,31 @@ const Input = {
     Memory.ram[Memory.MOUSE_BUTTON_ADDRESS] = this.mouseDown ? 1 : 0;
     Memory.ram[Memory.MOUSE_X_ADDRESS] = this.mouseX;
     Memory.ram[Memory.MOUSE_Y_ADDRESS] = this.mouseY;
-    Memory.ram[Memory.MOUSE_PIXEL_ADDRESS] = Memory.VIDEO_MEMORY_START + (Math.floor(this.mouseY)) * Display.SCREEN_WIDTH + Math.floor(this.mouseX);
+    Memory.ram[Memory.MOUSE_PIXEL_ADDRESS] =
+      Memory.VIDEO_MEMORY_START + Math.floor(this.mouseY) * Display.SCREEN_WIDTH + Math.floor(this.mouseX);
     Memory.ram[Memory.RANDOM_NUMBER_ADDRESS] = Math.floor(Math.random() * 255);
     Memory.ram[Memory.CURRENT_TIME_ADDRESS] = Date.now();
-  },
+  }
 };
 
 // 5.AUDIO
+
+const AudioContext =
+  window.AudioContext || // Default
+  window.webkitAudioContext || // Safari and old versions of Chrome
+  false;
 
 const Audio = {
   WAVETYPES: {
     '0': 'square',
     '1': 'sawtooth',
     '2': 'triangle',
-    '3': 'sine',
+    '3': 'sine'
   },
 
   MAX_GAIN: 0.15,
 
-  audioCtx: new AudioContext(),
+  audioCtx: AudioContext && new AudioContext(),
 
   audioChannels: [],
 
@@ -677,7 +680,7 @@ const Audio = {
     const state = {
       gain: 0,
       oscillatorType: 'square',
-      frequency: 440,
+      frequency: 440
     };
 
     gainNode.gain.value = state.gain;
@@ -691,17 +694,17 @@ const Audio = {
       freqAddr,
       volAddr,
       gainNode,
-      oscillatorNode,
+      oscillatorNode
     });
   },
 
   updateAudio() {
     this.audioChannels.forEach(channel => {
       const frequency = (Memory.ram[channel.freqAddr] || 0) / 1000;
-      const gain = !CPU.running ? 0 : (Memory.ram[channel.volAddr] || 0) / 100 * this.MAX_GAIN;
+      const gain = !CPU.running ? 0 : ((Memory.ram[channel.volAddr] || 0) / 100) * this.MAX_GAIN;
       const oscillatorType = this.WAVETYPES[Memory.ram[channel.wavetypeAddr] || 0];
 
-      const {state} = channel;
+      const { state } = channel;
       if (state.gain !== gain) {
         channel.gainNode.gain.setValueAtTime(gain, this.audioCtx.currentTime);
         state.gain = gain;
@@ -733,7 +736,7 @@ const Audio = {
       Memory.AUDIO_CH3_FREQUENCY_ADDRESS,
       Memory.AUDIO_CH3_VOLUME_ADDRESS
     );
-  },
+  }
 };
 
 // 6.ASSEMBLER
@@ -760,9 +763,7 @@ const Assembler = {
 
   initInstructionsLabelOperands() {
     Object.keys(CPU.instructions).forEach(name => {
-      const labelOperandIndex = CPU.instructions[name].operands.findIndex(operand =>
-        operand[1] === 'label'
-      );
+      const labelOperandIndex = CPU.instructions[name].operands.findIndex(operand => operand[1] === 'label');
       if (labelOperandIndex > -1) {
         this.instructionsLabelOperands.set(name, labelOperandIndex);
       }
@@ -773,12 +774,13 @@ const Assembler = {
     const programInstructions = [];
     const lines = programText.split('\n');
     for (let line of lines) {
-      const instruction = {name: '', operands: []};
-      let tokens = line.replace(/;.*$/, '') // strip comments
+      const instruction = { name: '', operands: [] };
+      let tokens = line
+        .replace(/;.*$/, '') // strip comments
         .split(' ');
       for (let token of tokens) {
         // skip empty tokens
-        if (token == null || token == "") {
+        if (token == null || token == '') {
           continue;
         }
         // first token
@@ -794,14 +796,10 @@ const Assembler = {
         } else {
           // handle text operands
           if (
-            (
-              // define name
-              instruction.name === 'define' &&
-              instruction.operands.length === 0
-            ) || (
-              // label used as operand
-              this.instructionsLabelOperands.get(instruction.name) === instruction.operands.length
-            )
+            // define name
+            (instruction.name === 'define' && instruction.operands.length === 0) ||
+            // label used as operand
+            this.instructionsLabelOperands.get(instruction.name) === instruction.operands.length
           ) {
             instruction.operands.push(token);
             continue;
@@ -828,8 +826,7 @@ const Assembler = {
         if (instruction.operands.length !== expectedOperands.length) {
           throw new Error(`Wrong number of operands for instruction ${instruction.name}
   got ${instruction.operands.length}, expected ${expectedOperands.length}
-  at line '${line}'`
-          );
+  at line '${line}'`);
         }
       }
 
@@ -838,7 +835,7 @@ const Assembler = {
         programInstructions.push(instruction);
       }
     }
-    programInstructions.push({name: 'halt', operands: []});
+    programInstructions.push({ name: 'halt', operands: [] });
     return programInstructions;
   },
 
@@ -892,7 +889,7 @@ const Assembler = {
         throw new Error(`No opcode found for instruction '${instruction.name}'`);
       }
       Memory.ram[loadingAddress++] = opcode;
-      
+
       // then, we write the operands for instruction to memory
       const operands = instruction.operands.slice(0);
 
@@ -996,7 +993,7 @@ const Simulation = {
       Assembler.assembleAndLoadProgram(Assembler.parseProgramText(programText));
     } catch (err) {
       alert(err.stack);
-      console.error(err.stack)
+      console.error(err.stack);
     }
     SimulatorUI.setLoadedProgramText(programText);
 
@@ -1021,14 +1018,13 @@ const Simulation = {
     } else {
       this.run();
     }
-  },
-}
+  }
+};
 
 // 8.BUILT-IN PROGRAMS
 
 const PROGRAMS = {
-  'Add':
-`
+  Add: `
 define a 0
 define b 1
 define result 2
@@ -1039,8 +1035,7 @@ add a b result
 ; look at memory location 2, you should now see '8'
 `,
 
-  'RandomPixels':
-`
+  RandomPixels: `
 define videoStartAddr 2100
 define videoEndAddr 3000
 define randomNumberAddr 2050
@@ -1067,8 +1062,7 @@ branch_if_not_equal_constant fillScreenPtr videoEndAddr FillScreenLoop ; if not 
 jump_to FillScreen ; filled screen, now start again from the top
 `,
 
-  'Paint':
-`Init:
+  Paint: `Init:
 
 define colorPickerStartAddr 2100
 define colorPickerEndAddr 2116
@@ -1109,7 +1103,7 @@ copy_into_ptr_from lastClickedAddr currentColorAddr ; set pixel at mouse cursor 
 jump_to MainLoop
 `,
 
-  'ChocolateRain': `
+  ChocolateRain: `
 define accumulatorAddr 0
 define dataTempAddr 1
 define musicPlayheadPtr 2
@@ -1404,7 +1398,7 @@ data -1
 
   'Custom 1': '',
   'Custom 2': '',
-  'Custom 3': '',
+  'Custom 3': ''
 };
 
 // boring code for rendering user interface of the simulator
@@ -1445,12 +1439,12 @@ const UI = {
   virtualizedScrollView(container, containerHeight, itemHeight, numItems, renderItems) {
     Object.assign(container.style, {
       height: `${containerHeight}px`,
-      overflow: 'auto',
+      overflow: 'auto'
     });
     const content = document.createElement('div');
     Object.assign(content.style, {
       height: `${itemHeight * numItems}px`,
-      overflow: 'hidden',
+      overflow: 'hidden'
     });
     container.appendChild(content);
 
@@ -1459,14 +1453,15 @@ const UI = {
 
     const overscan = 10; // how many rows above/below viewport to render
 
-    const renderRowsInView = () => requestAnimationFrame(() => {
-      const start = Math.max(0, Math.floor(container.scrollTop / itemHeight) - overscan);
-      const end = Math.min(numItems, Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan);
-      const offsetTop = start * itemHeight;
+    const renderRowsInView = () =>
+      requestAnimationFrame(() => {
+        const start = Math.max(0, Math.floor(container.scrollTop / itemHeight) - overscan);
+        const end = Math.min(numItems, Math.ceil((container.scrollTop + containerHeight) / itemHeight) + overscan);
+        const offsetTop = start * itemHeight;
 
-      rows.style.transform = `translateY(${offsetTop}px)`;
-      rows.innerHTML = renderItems(start, end);
-    });
+        rows.style.transform = `translateY(${offsetTop}px)`;
+        rows.innerHTML = renderItems(start, end);
+      });
 
     container.onscroll = renderRowsInView;
 
@@ -1503,14 +1498,14 @@ const SimulatorUI = {
     if (/firefox/i.test(navigator.userAgent)) {
       imageRendering = '-moz-crisp-edges';
     }
-    Object.assign(SimulatorUI.getCanvas(), {width, height});
+    Object.assign(SimulatorUI.getCanvas(), { width, height });
     // scale our (very low resolution) canvas up to a more viewable size using CSS transforms
     // $FlowFixMe: ignore unknown property '-ms-interpolation-mode'
     Object.assign(SimulatorUI.getCanvas().style, {
       transformOrigin: 'top left',
       transform: `scale(${pixelScale})`,
       '-ms-interpolation-mode': 'nearest-neighbor',
-      imageRendering,
+      imageRendering
     });
   },
 
@@ -1527,8 +1522,7 @@ const SimulatorUI = {
   selectProgram() {
     this.selectedProgram = UI.$Select('#programSelector').value;
     localStorage.setItem('selectedProgram', this.selectedProgram);
-    UI.$TextArea('#program').value =
-      localStorage.getItem(this.selectedProgram) || PROGRAMS[this.selectedProgram] || '';
+    UI.$TextArea('#program').value = localStorage.getItem(this.selectedProgram) || PROGRAMS[this.selectedProgram] || '';
     this.updateLoadProgramButton();
   },
 
@@ -1560,8 +1554,9 @@ const SimulatorUI = {
     UI.$Input('#fullspeed').checked = fullspeed;
     UI.$Input('#speed').value = String(-Simulation.delayBetweenCycles);
     UI.$('#debugger').classList.toggle('fullspeed', runningAtFullspeed);
-    UI.$('#debuggerMessageArea').textContent = runningAtFullspeed ?
-      'debug UI disabled when CPU.running at full speed' : '';
+    UI.$('#debuggerMessageArea').textContent = runningAtFullspeed
+      ? 'debug UI disabled when CPU.running at full speed'
+      : '';
   },
 
   updateUI() {
@@ -1594,7 +1589,7 @@ const SimulatorUI = {
     UI.$TextArea('#workingMemoryView').textContent = lines.join('\n');
   },
 
-  scrollToProgramLine: (item) => {},
+  scrollToProgramLine: item => {},
   updateProgramMemoryView() {
     const lines = [];
     for (var i = Memory.PROGRAM_MEMORY_START; i < Memory.PROGRAM_MEMORY_END; i++) {
@@ -1603,20 +1598,23 @@ const SimulatorUI = {
       if (instruction) {
         const operands = CPU.instructions[instruction].operands;
         for (var j = 0; j < operands.length; j++) {
-          lines.push(`${padRight(i + 1 + j, 4)}: ${padRight(Memory.ram[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`);
+          lines.push(
+            `${padRight(i + 1 + j, 4)}: ${padRight(Memory.ram[i + 1 + j], 8)}   ${operands[j][0]} (${operands[j][1]})`
+          );
         }
         i += operands.length;
       }
     }
-    
+
     const itemHeight = 14;
     const renderProgramMemoryView = UI.virtualizedScrollView(
       UI.$('#programMemoryView'),
       136,
       itemHeight,
       lines.length,
-      (start, end) => (
-        lines.slice(start, end)
+      (start, end) =>
+        lines
+          .slice(start, end)
           .map((l, i) => {
             const current = Memory.PROGRAM_MEMORY_START + start + i === CPU.programCounter;
             return `
@@ -1627,20 +1625,21 @@ const SimulatorUI = {
             `;
           })
           .join('')
-      )
     );
 
-    this.scrollToProgramLine = (item) => {
+    this.scrollToProgramLine = item => {
       UI.$('#programMemoryView').scrollTop = item * itemHeight;
-      renderProgramMemoryView(); 
+      renderProgramMemoryView();
     };
 
     renderProgramMemoryView();
   },
 
   updateInputMemoryView() {
-    UI.$TextArea('#inputMemoryView').textContent =
-      `${Memory.KEYCODE_0_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_0_ADDRESS], 8)} keycode 0
+    UI.$TextArea('#inputMemoryView').textContent = `${Memory.KEYCODE_0_ADDRESS}: ${padRight(
+      Memory.ram[Memory.KEYCODE_0_ADDRESS],
+      8
+    )} keycode 0
 ${Memory.KEYCODE_1_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_1_ADDRESS], 8)} keycode 1
 ${Memory.KEYCODE_2_ADDRESS}: ${padRight(Memory.ram[Memory.KEYCODE_2_ADDRESS], 8)} keycode 2
 ${Memory.MOUSE_X_ADDRESS}: ${padRight(Memory.ram[Memory.MOUSE_X_ADDRESS], 8)} mouse x
@@ -1660,18 +1659,29 @@ ${Memory.CURRENT_TIME_ADDRESS}: ${padRight(Memory.ram[Memory.CURRENT_TIME_ADDRES
   },
 
   updateAudioMemoryView() {
-    UI.$TextArea('#audioMemoryView').textContent =
-  `${Memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_WAVETYPE_ADDRESS], 8)} audio ch1 wavetype
-${Memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_FREQUENCY_ADDRESS], 8)} audio ch1 frequency
+    UI.$TextArea('#audioMemoryView').textContent = `${Memory.AUDIO_CH1_WAVETYPE_ADDRESS}: ${padRight(
+      Memory.ram[Memory.AUDIO_CH1_WAVETYPE_ADDRESS],
+      8
+    )} audio ch1 wavetype
+${Memory.AUDIO_CH1_FREQUENCY_ADDRESS}: ${padRight(
+      Memory.ram[Memory.AUDIO_CH1_FREQUENCY_ADDRESS],
+      8
+    )} audio ch1 frequency
 ${Memory.AUDIO_CH1_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH1_VOLUME_ADDRESS], 8)} audio ch1 volume
 ${Memory.AUDIO_CH2_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_WAVETYPE_ADDRESS], 8)} audio ch2 wavetype
-${Memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_FREQUENCY_ADDRESS], 8)} audio ch2 frequency
+${Memory.AUDIO_CH2_FREQUENCY_ADDRESS}: ${padRight(
+      Memory.ram[Memory.AUDIO_CH2_FREQUENCY_ADDRESS],
+      8
+    )} audio ch2 frequency
 ${Memory.AUDIO_CH2_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH2_VOLUME_ADDRESS], 8)} audio ch2 volume
 ${Memory.AUDIO_CH3_WAVETYPE_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_WAVETYPE_ADDRESS], 8)} audio ch3 wavetype
-${Memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_FREQUENCY_ADDRESS], 8)} audio ch3 frequency
+${Memory.AUDIO_CH3_FREQUENCY_ADDRESS}: ${padRight(
+      Memory.ram[Memory.AUDIO_CH3_FREQUENCY_ADDRESS],
+      8
+    )} audio ch3 frequency
 ${Memory.AUDIO_CH3_VOLUME_ADDRESS}: ${padRight(Memory.ram[Memory.AUDIO_CH3_VOLUME_ADDRESS], 8)} audio ch3 volume`;
-  },
-}
+  }
+};
 
 function clamp(val, min, max) {
   return Math.min(min, Math.max(max, val));
@@ -1681,7 +1691,7 @@ function padRight(input, length) {
   const str = input + '';
   let padded = str;
   for (var i = str.length; i < length; i++) {
-    padded += " ";
+    padded += ' ';
   }
   return padded;
 }
