@@ -29,7 +29,9 @@ const Memory = {
   binary: a 1 digit hexadecimal number can represent exactly all of the values
   which a 4 digit binary number can. However, we are going to represent addresses
   and values as base-10 numbers (the kind you're used to), so there's one less
-  thing you need know about at this point.
+  thing you need know about at this point. If you like you can read more about
+  binary and hexidecimal numbers here (but it's not essential): 
+  https://jamesfriend.com.au/how-do-binary-and-hexadecimal-numbers-work
   */
   ram: [],
 
