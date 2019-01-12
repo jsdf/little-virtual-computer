@@ -56,9 +56,14 @@ const Memory = {
   2013: mouse button status (0 = up, 1 = down)
   2050: a random number which changes before every instruction
   2051 - 2099: unused
-  2100 - 2999: The color values of the pixels of the 30x30 pixel screen, row by
-    row, from the top left. For example, the top row uses slots 2100 - 2129, and
-    the bottom row uses slots 2970 - 3000.
+  2100 - 2999: The content of the screen, specifically the color values of each
+    of the pixels of the 30x30 pixel screen, row by row, from the top left.
+    For example, the top row uses slots 2100 - 2129, and the bottom row uses
+    slots 2970 - 3000.
+  3000 - 3008: Memory addresses used to control 3 channels of audio output. This
+  computer is too simple to play recorded sounds, but can simple tones, which you
+  can control by setting the addresses for 'wavetype', frequency and volume of
+  each channel.
   */
   TOTAL_MEMORY_SIZE: 3100,
   WORKING_MEMORY_START: 0,
@@ -113,46 +118,6 @@ const Memory = {
 
 const CPU = {
   /*
-  As we move through our program, we need to keep track of where we are up to.
-  The program counter contains a memory address pointing to the location of the
-  program instruction we are currently executing.
-  In a real computer, there is a small piece of memory inside the CPU which
-  holds this information, called the 'program counter'. The program counter is
-  one of several 'registers', which are basically tiny pieces of memory built
-  right into the CPU, which just hold one value at a time, but can be accessed
-  very quickly.
-  */
-  programCounter: Memory.PROGRAM_START,
-
-  /*
-  We also need to keep track of whether the CPU is running or not. The 'break'
-  instruction, which is like 'debugger' in Javascript, will be implemented by
-  setting this to false. This will cause the simulator to stop, but we can still
-  resume the program
-  The 'halt' instruction will tell the CPU that we are at the end of the program,
-  so it should stop executing instructions, and can't be resumed.
-  */
-  running: false,
-  halted: false,
-
-  reset() {
-    this.programCounter = Memory.PROGRAM_START;
-    this.halted = false;
-    this.running = false;
-  },
-
-  /*
-  Move the program counter forward to the next memory address and return the
-  opcode or data at that location
-  */
-  advanceProgramCounter() {
-    if (this.programCounter < Memory.PROGRAM_MEMORY_START || this.programCounter >= Memory.PROGRAM_MEMORY_END) {
-      throw new Error(`program counter outside valid program memory region at ${this.programCounter}`);
-    }
-    return Memory.get(this.programCounter++);
-  },
-
-  /*
   These instructions represent the things the CPU can be told to do. We
   implement them here with code, but a real CPU would have circuitry
   implementing each one of these possible actions, which include things like
@@ -170,8 +135,15 @@ const CPU = {
   distinctive when we see them in the memory viewer. We'll include some extra info
   about each of the instructions so our simulator user interface can show it
   alongside the 'disassembled' view of the program code in Memory.
+  
+  There are a lot of these, so it's probably not worth reading the code for each one,
+  but they are grouped into sections of related instructions, so it might be worth
+  taking a look at a few in each section. When you're done you can skip ahead to the 
+  next part which defines the 'programCounter'.
   */
   instructions: {
+    // First, some instructions for copying values between places in memory.
+
     // this instruction is typically called 'mov', short for 'move', as in 'move
     // value at *this* address to *that* address', but this naming can be a bit
     // confusing, because the operation doesn't remove the value at the source
@@ -224,6 +196,8 @@ const CPU = {
         Memory.set(destinationAddress, labelAddress);
       }
     },
+
+    // Next, some instructions for performing arithmetic
     add: {
       opcode: 9010,
       description: `add the value at the 'a' address with the value at the 'b'
@@ -343,6 +317,8 @@ const CPU = {
         Memory.set(resultAddress, result);
       }
     },
+
+    // some instructions for comparing values
     compare: {
       opcode: 9090,
       description: `compare the value at the 'a' address and the value at the 'b'
@@ -379,6 +355,8 @@ const CPU = {
         Memory.set(resultAddress, result);
       }
     },
+
+    // some instructions for controlling the flow of the program
     jump_to: {
       opcode: 9100,
       description: `set the program counter to the address of the label specified,
@@ -442,6 +420,8 @@ const CPU = {
         }
       }
     },
+
+    // some additional miscellanous instructions
     data: {
       opcode: 9200,
       description: `operands given will be included in the program when it is
@@ -470,17 +450,61 @@ const CPU = {
   },
 
   /*
+  In a real computer, there are small pieces of memory inside the CPU called
+  'registers', which just hold one value at a time, but can be accessed
+  very quickly. These are used for a few different purposes, such as holding a
+  value that we are going to do some arithmetic operations with, before storing
+  it back to the main memory of the computer. For simplicity in this simulator
+  our CPU will just directly with the values in main memory instead.
+  
+  However, there is one CPU register we do need to simulate: the 'program counter'.
+  As we move through our program, we need to keep track of where we are up to.
+  The program counter contains a memory address pointing to the location of the
+  program instruction we are currently executing.
+  */
+  programCounter: Memory.PROGRAM_START,
+
+  /*
+  We also need to keep track of whether the CPU is running or not. The 'break'
+  instruction, which is like 'debugger' in Javascript, will be implemented by
+  setting this to false. This will cause the simulator to stop, but we can still
+  resume the program
+  The 'halt' instruction will tell the CPU that we are at the end of the program,
+  so it should stop executing instructions, and can't be resumed.
+  */
+  running: false,
+  halted: false,
+
+  reset() {
+    this.programCounter = Memory.PROGRAM_START;
+    this.halted = false;
+    this.running = false;
+  },
+
+  /*
+  Move the program counter forward to the next memory address and return the
+  opcode or data at that location
+  */
+  advanceProgramCounter() {
+    if (this.programCounter < Memory.PROGRAM_MEMORY_START || this.programCounter >= Memory.PROGRAM_MEMORY_END) {
+      throw new Error(`program counter outside valid program memory region at ${this.programCounter}`);
+    }
+    return Memory.get(this.programCounter++);
+  },
+
+  /*
   We'll set up a mapping between our instruction names and the numerical values
   we will turn them into when we assemble the program. It is these numerical
-  values which will be interpreted by our simulated CPU as it runs the program.
+  values ('opcodes') which will be interpreted by our simulated CPU as it runs the
+  program.
   */
   instructionsToOpcodes: new Map(),
   opcodesToInstructions: new Map(),
 
   /*
   Advances through the program by one instruction, getting input from the input
-  devices (keyboard, mouse), executing the instruction, then writing output to the
-  output devices (screen, audio).
+  devices (keyboard, mouse), and then executing the instruction. After calling this,
+  we'll still need to handle writing output to the output devices (screen, audio).
   */
   step() {
     Input.updateInputs();
