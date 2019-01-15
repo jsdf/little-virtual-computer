@@ -656,8 +656,8 @@ const Input = {
     const screenPageTop = SimulatorUI.getCanvas().getBoundingClientRect().top + window.scrollY;
     const screenPageLeft = SimulatorUI.getCanvas().getBoundingClientRect().left + window.scrollX;
     SimulatorUI.getCanvas().onmousemove = (event) => {
-      this.mouseX = Math.floor((event.pageX - screenPageTop) / Display.SCREEN_PIXEL_SCALE);
-      this.mouseY = Math.floor((event.pageY - screenPageLeft) / Display.SCREEN_PIXEL_SCALE);
+      this.mouseX = Math.floor((event.pageX - screenPageTop) / Display.SCREEN_PIXEL_SCALE) + 6;
+      this.mouseY = Math.floor((event.pageY - screenPageLeft) / Display.SCREEN_PIXEL_SCALE) - 6;
     };
   },
 
