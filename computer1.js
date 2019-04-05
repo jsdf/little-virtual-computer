@@ -678,6 +678,10 @@ const Input = {
 
 // 5.AUDIO
 
+const AudioContext =
+  window.AudioContext || // Default
+  window.webkitAudioContext || // Safari and old versions of Chrome
+  false;
 const Audio = {
   WAVETYPES: {
     '0': 'square',
@@ -688,7 +692,7 @@ const Audio = {
 
   MAX_GAIN: 0.15,
 
-  audioCtx: new AudioContext(),
+  audioCtx: AudioContext && new AudioContext(),
 
   audioChannels: [],
 
