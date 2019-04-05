@@ -48,7 +48,7 @@
           <select id="programSelector" onchange="SimulatorUI.selectProgram()"></select>
           <button id="loadProgramButton" onclick="Simulation.loadProgramAndReset()">load program</button>
         </label>
-        <textarea id="program" rows="10" cols="80" onchange="SimulatorUI.editProgramText()" onkeyup="editProgramText()" style="margin-top: 10px">
+        <textarea id="program" rows="10" cols="80" onchange="SimulatorUI.editProgramText()" onkeyup="SimulatorUI.editProgramText()" style="margin-top: 10px">
         </textarea>
       </div>
     </div>

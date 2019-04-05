@@ -796,74 +796,87 @@ const Assembler = {
     });
   },
 
+  // we break our program code into lines, then break those lines into 'tokens',
+  // and then 'parse' that line of tokens into an instruction plus its operands
   parseProgramText(programText) {
     const programInstructions = [];
     const lines = programText.split('\n');
-    for (let line of lines) {
-      const instruction = {name: '', operands: []};
-      let tokens = line.replace(/;.*$/, '') // strip comments
-        .split(' ');
-      for (let token of tokens) {
-        // skip empty tokens
-        if (token == null || token == "") {
-          continue;
-        }
-        // first token
-        if (!instruction.name) {
-          // special case for labels
-          if (token.endsWith(':')) {
-            instruction.name = 'label';
-            instruction.operands.push(token.slice(0, token.length - 1));
-            break;
-          }
-
-          instruction.name = token; // instruction name token
-        } else {
-          // handle text operands
-          if (
-            (
-              // define name
-              instruction.name === 'define' &&
-              instruction.operands.length === 0
-            ) || (
-              // label used as operand
-              this.instructionsLabelOperands.get(instruction.name) === instruction.operands.length
-            )
-          ) {
-            instruction.operands.push(token);
+    let line, i;
+    try {
+      for (i = 0; i < lines.length; i++) {
+        line = lines[i];
+        const instruction = {name: '', operands: []};
+        let tokens = line.replace(/;.*$/, '') // strip comments
+          .split(' ');
+        for (let token of tokens) {
+          // skip empty tokens
+          if (token == null || token == "") {
             continue;
           }
+          // first token
+          if (!instruction.name) {
+            // special case for labels
+            if (token.endsWith(':')) {
+              instruction.name = 'label';
+              instruction.operands.push(token.slice(0, token.length - 1));
+              break;
+            }
 
-          // try to parse number operands
-          const number = parseInt(token, 10);
-          if (Number.isNaN(number)) {
-            instruction.operands.push(token);
+            instruction.name = token; // instruction name token
           } else {
-            instruction.operands.push(number);
+            // handle text operands
+            if (
+              (
+                // define name
+                instruction.name === 'define' &&
+                instruction.operands.length === 0
+              ) || (
+                // label used as operand
+                this.instructionsLabelOperands.get(instruction.name) === instruction.operands.length
+              )
+            ) {
+              instruction.operands.push(token);
+              continue;
+            }
+
+            // try to parse number operands
+            const number = parseInt(token, 10);
+            if (Number.isNaN(number)) {
+              instruction.operands.push(token);
+            } else {
+              instruction.operands.push(number);
+            }
           }
         }
-      }
 
-      // validate number of operands given
-      if (
-        instruction.name &&
-        instruction.name !== 'label' &&
-        instruction.name !== 'data' &&
-        instruction.name !== 'define'
-      ) {
-        const expectedOperands = CPU.instructions[instruction.name].operands;
-        if (instruction.operands.length !== expectedOperands.length) {
-          throw new Error(`Wrong number of operands for instruction ${instruction.name}
+        // validate number of operands given
+        if (
+          instruction.name &&
+          instruction.name !== 'label' &&
+          instruction.name !== 'data' &&
+          instruction.name !== 'define'
+        ) {
+          const expectedOperands = CPU.instructions[instruction.name].operands;
+          if (instruction.operands.length !== expectedOperands.length) {
+            const error = new Error(
+              `Wrong number of operands for instruction ${instruction.name}
   got ${instruction.operands.length}, expected ${expectedOperands.length}
-  at line '${line}'`
-          );
+  at line ${i+1}: '${line}'`
+            );
+            error.isException = true;
+            throw error;
+          }
+        }
+
+        //  if instruction was found on this line, add it to the program
+        if (instruction.name) {
+          programInstructions.push(instruction);
         }
       }
-
-      //  if instruction was found on this line, add it to the program
-      if (instruction.name) {
-        programInstructions.push(instruction);
-      }
+    } catch (err) {
+      if (err.isException) throw err; // validation error
+      // otherwise it must be a parsing/syntax error
+      throw new Error(`Syntax error on program line ${i+1}: '${line}'`);
     }
     programInstructions.push({name: 'halt', operands: []});
     return programInstructions;
@@ -1022,8 +1035,8 @@ const Simulation = {
     try {
       Assembler.assembleAndLoadProgram(Assembler.parseProgramText(programText));
     } catch (err) {
-      alert(err.stack);
-      console.error(err.stack)
+      alert(err.message);
+      console.error(err);
     }
     SimulatorUI.setLoadedProgramText(programText);
 
