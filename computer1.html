@@ -2,8 +2,6 @@
 <html>
 <head>
   <title>Little Virtual Computer 1</title>
-</head>
-<body>
   <style type="text/css">
     body {
       font-size: 12px;
@@ -33,6 +31,8 @@
       margin: 0;
     }
   </style>
+</head>
+<body>
   <div style="background-color: #eee;padding: 1em;margin: 1em 0;font-size: 1.3em">
     <h1 style="margin: 0.2em 0; font-weight: normal">Little Virtual Computer</h1>
     This is a simple simulated computer. You can read the source code <a href="https://github.com/jsdf/little-virtual-computer/blob/master/computer1.js">here</a>. Click 'run/pause' to make it go, or load a different program with the program selector in the bottom left.
@@ -40,7 +40,7 @@
   <div style="display: flex;">
     <div style="width: 620px">
       <div style="width: 600px; height: 600px">
-        <canvas id="canvas""></canvas>
+        <canvas id="canvas"></canvas>
       </div>
       <div style="margin-top: 10px">
         <label>
@@ -59,26 +59,21 @@
         <button onclick="Simulation.loadProgramAndReset()">reset</button>
         <span id="running"></span>
       </div>
-      <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="SimulatorUI.setSpeed()"></input>
-      <label>full speed <input id="fullspeed" type="checkbox" checked onchange="SimulatorUI.setFullspeed()"></input></label>
+      <label>slow-mo speed <input id="speed" type="range" min="-500" max="-1" value="-1" onchange="SimulatorUI.setSpeed()" /></label>
+      <label>full speed <input id="fullspeed" type="checkbox" checked onchange="SimulatorUI.setFullspeed()" /></label>
       <div id="debugger" style="width: 400px">
         <div id="debuggerMessageArea" style="height: 20px"></div>
-        <label>program counter <input id="programCounter"></input></label>
+        <label>program counter <input id="programCounter" /></label>
         working memory (slots 0 - 999):
-        <textarea id="workingMemoryView" readonly rows="10" cols="40">
-        </textarea>
+        <textarea id="workingMemoryView" readonly rows="10" cols="40"></textarea>
         program memory (slots 1000 - 1999):
-        <div id="programMemoryView">
-        </div>
+        <div id="programMemoryView"></div>
         input memory (slots 2000 - 2051):
-        <textarea id="inputMemoryView" readonly rows="8" cols="40">
-        </textarea>
+        <textarea id="inputMemoryView" readonly rows="8" cols="40"></textarea>
         video memory (slots 2100 - 2999):
-        <textarea id="videoMemoryView" readonly rows="10" cols="40">
-        </textarea>
+        <textarea id="videoMemoryView" readonly rows="10" cols="40"></textarea>
         audio memory (slots 3000 - 3000):
-        <textarea id="audioMemoryView" readonly rows="10" cols="40">
-        </textarea>
+        <textarea id="audioMemoryView" readonly rows="10" cols="40"></textarea>
       </div>
     </div>
   </div>
